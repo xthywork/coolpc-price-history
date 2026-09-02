@@ -59,9 +59,21 @@ def search_page(
         "max_change_percent": max_change_percent, "sort": sort,
     }.items() if v not in (None, "")}
 
+    subcategory_rows = (
+        session.query(Subcategory, Category)
+        .join(Category, Subcategory.category_id == Category.id)
+        .order_by(Category.name, Subcategory.name)
+        .all()
+    )
+    subcategories = [
+        {"id": sc.id, "label": f"{cat.name} / {sc.name}"}
+        for sc, cat in subcategory_rows
+    ]
+
     return templates.TemplateResponse(request, "search.html", {
         "rows": rows,
         "categories": session.query(Category).order_by(Category.name).all(),
+        "subcategories": subcategories,
         "query": {
             "q": q or "", "category_id": category_id, "subcategory_id": subcategory_id,
             "brand": brand, "model": model,

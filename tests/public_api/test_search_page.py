@@ -73,3 +73,41 @@ def test_search_page_pagination_link_preserves_query():
     assert resp.status_code == 200
     assert "sort=price_desc" in resp.text
     assert "page=2" in resp.text
+
+
+def test_search_page_subcategory_select_and_filter():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat1 = Category(name="顯示卡VGA")
+        sub1 = Subcategory(name="NVIDIA", category=cat1)
+        cat2 = Category(name="主機板MB")
+        sub2 = Subcategory(name="ASUS", category=cat2)
+        session.add_all([cat1, sub1, cat2, sub2])
+        session.flush()
+
+        p1 = Product(category_id=cat1.id, subcategory_id=sub1.id, current_name="顯卡商品A",
+                      current_price=10000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat2.id, subcategory_id=sub2.id, current_name="主機板商品B",
+                      current_price=5000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.flush()
+        session.add(ProductName(product_id=p1.id, name=p1.current_name, first_seen_at=t, last_seen_at=t))
+        session.add(ProductName(product_id=p2.id, name=p2.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+        sub1_id = sub1.id
+
+    # 未篩選：頁面應列出兩個子分類選項，且兩個商品都出現
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "顯示卡VGA / NVIDIA" in resp.text
+    assert "主機板MB / ASUS" in resp.text
+    assert "顯卡商品A" in resp.text
+    assert "主機板商品B" in resp.text
+
+    # 依 subcategory_id 篩選：結果只剩該子分類的商品，且該選項被標記 selected
+    resp = client.get("/", params={"subcategory_id": sub1_id})
+    assert resp.status_code == 200
+    assert "顯卡商品A" in resp.text
+    assert "主機板商品B" not in resp.text
+    assert f'value="{sub1_id}" selected' in resp.text

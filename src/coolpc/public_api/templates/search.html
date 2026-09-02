@@ -9,6 +9,12 @@
     <option value="{{ c.id }}" {% if query.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
     {% endfor %}
   </select>
+  <select name="subcategory_id">
+    <option value="">全部子分類</option>
+    {% for sc in subcategories %}
+    <option value="{{ sc.id }}" {% if query.subcategory_id == sc.id %}selected{% endif %}>{{ sc.label }}</option>
+    {% endfor %}
+  </select>
   <input type="text" name="brand" placeholder="品牌" value="{{ query.brand or '' }}">
   <input type="text" name="model" placeholder="型號" value="{{ query.model or '' }}">
   <input type="number" name="min_price" placeholder="最低價格" value="{{ query.min_price or '' }}">
