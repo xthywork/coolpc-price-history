@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
@@ -47,10 +48,12 @@ def do_merge(source_id: int = Form(...), target_id: int = Form(...),
     try:
         merge_products(session, source_id, target_id)
         session.commit()
-        return RedirectResponse(url="/merge?message=合併成功", status_code=303)
+        qs = urlencode({"message": "合併成功"})
+        return RedirectResponse(url=f"/merge?{qs}", status_code=303)
     except MergeError as exc:
         session.rollback()
-        return RedirectResponse(url=f"/merge?error={exc}", status_code=303)
+        qs = urlencode({"error": str(exc)})
+        return RedirectResponse(url=f"/merge?{qs}", status_code=303)
 
 
 @router.post("/merge/{merge_log_id}/undo")
@@ -58,7 +61,9 @@ def do_undo(merge_log_id: int, session: Session = Depends(get_session)):
     try:
         undo_merge(session, merge_log_id)
         session.commit()
-        return RedirectResponse(url="/merge?message=已復原合併", status_code=303)
+        qs = urlencode({"message": "已復原合併"})
+        return RedirectResponse(url=f"/merge?{qs}", status_code=303)
     except MergeError as exc:
         session.rollback()
-        return RedirectResponse(url=f"/merge?error={exc}", status_code=303)
+        qs = urlencode({"error": str(exc)})
+        return RedirectResponse(url=f"/merge?{qs}", status_code=303)

@@ -1,4 +1,6 @@
 import datetime
+from urllib.parse import urlparse, parse_qs
+from markupsafe import escape
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -6,6 +8,8 @@ from sqlalchemy.pool import StaticPool
 from coolpc.db.models import Base, Category, Subcategory, Product, ProductName, MergeLog
 from coolpc.admin_api.app import app
 from coolpc.admin_api.dependencies import get_session
+from coolpc.admin_api.routers import products as products_router
+from coolpc.merging.service import MergeError
 
 
 def _make_client():
@@ -114,3 +118,39 @@ def test_undo_already_undone_merge_shows_error_via_http():
 
 def resp_contains_undone_once(text: str) -> bool:
     return "已復原" in text
+
+
+def test_merge_error_message_with_special_characters_survives_redirect(monkeypatch):
+    """Regression test for the redirect-URL-building fix: error/message text must be
+    properly urlencoded, not f-string-interpolated raw into the query string. Real
+    MergeError messages from Task 15 never happen to contain '&', '=', or '#' today, so
+    this monkeypatches merge_products (as imported into the products router module) to
+    raise a MergeError whose message deliberately contains those query-string-special
+    characters, and verifies the text survives the redirect round-trip unmangled -
+    proving the query string isn't fragmented or truncated."""
+    client, Session_ = _make_client()
+    source_id, target_id = _seed_two_products(Session_)
+
+    tricky_message = "錯誤：a&b=c#d"
+
+    def fake_merge_products(session, source_id, target_id):
+        raise MergeError(tricky_message)
+
+    monkeypatch.setattr(products_router, "merge_products", fake_merge_products)
+
+    resp = client.post("/merge", data={"source_id": source_id, "target_id": target_id},
+                        follow_redirects=False)
+    assert resp.status_code == 303
+    location = resp.headers["location"]
+
+    # The query string must contain exactly one 'error' param with the full, unmangled
+    # message - not fragmented into spurious extra params by the raw '&'/'=' characters.
+    parsed_qs = parse_qs(urlparse(location).query)
+    assert parsed_qs["error"] == [tricky_message]
+
+    merge_page = client.get(location)
+    assert merge_page.status_code == 200
+    # The template HTML-escapes {{ error }} on render (Jinja2 autoescape turns '&' into
+    # '&amp;'), so compare against the escaped form here - the query-string-level
+    # round-trip integrity was already proven above via parse_qs on the raw redirect URL.
+    assert str(escape(tricky_message)) in merge_page.text
