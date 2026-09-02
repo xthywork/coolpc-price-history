@@ -101,6 +101,92 @@ def extract_status(name: str) -> str | None:
     return None
 
 
+# 全語料庫（842 份樣本）掃描發現：原價屋會把「限時促銷倒數期限」直接黏在
+# 商品名稱尾端、緊接在價格逗號之前，而且期限會隨著促銷檔期改變。因為本系統
+# 的商品比對是「name 完全相等」（無自動合併），這種會變動的尾綴文字會讓
+# 同一個實體商品在不同快照被誤判成不同商品，破壞價格歷史的連續性。
+# 目前確認的兩種格式，兩種都已用全語料庫驗證「同一個商品、不同快照出現不同
+# 期限文字」（真正的 volatile，不是單純猜測）：
+#   1) "▼下殺到 M/D HH:MM"（限時下殺倒數），例如
+#      "...DC15250-R4508STW▼下殺到 2/4 23:59, $21990↘$16999 ◆ ★"。
+#      全語料庫累計 125,548 次、2,092 種不同商品名稱受影響；同一台螢幕在
+#      某些快照是 "...▼下殺到 5/14 23:59"，另一些快照是
+#      "...▼下殺到 5/17 23:59"。
+#   2) "優惠至 M/D" / "活動至 M/D止"（任搭/組合優惠檔期到期日），例如
+#      "...16+2+2相*任搭優惠至3/31"。全語料庫驗證：同一片主機板／顯卡在
+#      不同快照分別出現過 "優惠至3/31"、"優惠至4/30"、"優惠至5/31"
+#      （檔期展延時商品名稱字串跟著變動）。
+# 這兩種格式都不含 $ 或箭頭符號，NAME_PRICE_* 系列的價格切分 regex 完全沒有
+# 依據可以把它們跟真正的商品名稱分開，所以會被切進 name 裡。因此獨立於價格
+# 切分之外，另外用一個專門的清理步驟把這些尾綴從 name 移除（在
+# split_name_price_badges 完成價格切分「之後」才處理，這是名稱清理的關注點，
+# 跟價格切分的關注點是分開的，不應該混進 NAME_PRICE_* regex 裡）。
+#
+# 另外全語料庫掃描還發現「限時」「春節限時」「限量活動」「酷幣5000」這類
+# 行銷用語也會在同一個實體商品（同型號）身上時有時無、時換時異（例如同一台
+# 華碩 Zenbook UX3407QA-0082G26100 曾出現過 "超輕盈 酷幣5000"、
+# "超輕盈/春節限時"、"超輕盈/限量活動"、單純 "超輕盈" 四種不同尾綴），理論上
+# 也會造成一樣的商品比對問題。但這類文字沒有像日期一樣的固定結構可以安全地
+# 用 regex 辨識邊界（不同商品的分隔符號、用字都不一致，貿然用關鍵字比對可能
+# 誤刪真正屬於商品名稱一部分的文字），所以這裡刻意不處理，記錄成已知風險，
+# 留給之後專門處理「商品名稱正規化/相似度比對」的 Task（見 Task 10）評估。
+PROMO_DEADLINE_SUFFIX_PATTERN = re.compile(
+    r"(?:▼下殺到\s*\d{1,2}/\d{1,2}\s*\d{1,2}:\d{2}"
+    r"|(?:優惠至|活動至)\s*\d{1,2}/\d{1,2}\s*止?)\s*$"
+)
+
+
+def strip_promo_deadline_suffix(name: str) -> str:
+    # 少數情況下不同促銷機制可能疊加出現（例如同時有下殺倒數與任搭優惠
+    # 期限），用迴圈重複套用直到沒有變化為止，避免只清掉最外層一次。
+    while True:
+        stripped = PROMO_DEADLINE_SUFFIX_PATTERN.sub("", name).strip()
+        if stripped == name:
+            return stripped
+        name = stripped
+
+
+# 每個 <select> 開頭都有一個 value="0" 的「共有商品 N 樣...」彙總選項，
+# 用來驗證解析結果數量是否正確（見 test_parse_html.py 的獨立回歸測試）。
+SUMMARY_COUNT_PATTERN = re.compile(r"共有商品\s*(\d+)")
+
+
+def _iter_select_options(select):
+    """走訪一個 <select> 底下所有 <option>，依文件順序 yield
+    (subcategory_name, option) pair。
+
+    真實 HTML 的 <optgroup> 沒有對應的 </optgroup> 結束標籤，lxml 會把後續
+    每個 <optgroup> 都巢狀解析進前一個 <optgroup> 內（見上方 NAME_PRICE_*
+    區塊的說明），所以不能只用 select.find_all("optgroup") 再對每個
+    optgroup 呼叫 find_all("option", recursive=False)：這樣做完全看不到
+    「不屬於任何 optgroup、直接是 <select> 子節點」的 <option>。
+
+    全語料庫掃描發現至少一個真實案例（2026-05-05-18-00.html 的
+    「滑鼠｜鼠墊｜數位板」分類）：5 個非停用、高單價的羅技賽車方向盤選項
+    直接是 <select> 的子節點，出現在第一個 <optgroup>（例如
+    "【周邊活動促銷專區】"）之前，完全沒有被任何 optgroup 包住。這類
+    「孤兒」選項在文件順序上一定出現在「目前 select 內第一個 optgroup 標籤」
+    之前（因為 lxml 的巢狀 bug 只會把後面的 optgroup 巢狀進第一個裡面，
+    不會讓後面的 option 又跑到 select 的直接子節點層級）。
+
+    做法：依文件順序遞迴走訪每一層的直接子節點（recursive=False 語意）。
+    遇到 <option> 就用「目前累積到的 subcategory_name」（尚未遇到任何
+    optgroup 時就是空字串，代表沒有分類）yield 出去；遇到 <optgroup> 就
+    把 subcategory_name 更新成它的 label，然後遞迴進去繼續走訪它自己的
+    直接子節點（這一層可能又是「它自己的孤兒 option」接著「下一個巢狀
+    optgroup」，如此遞迴下去，剛好對應原始文件裡本來就是兄弟關係、只是
+    被 lxml 誤判成巢狀的那條鏈）。
+    """
+    subcategory_name = ""
+    for child in select.children:
+        tag_name = getattr(child, "name", None)
+        if tag_name == "option":
+            yield subcategory_name, child
+        elif tag_name == "optgroup":
+            subcategory_name = child.get("label", "").strip()
+            yield from _iter_select_options(child)
+
+
 def parse_products(soup: BeautifulSoup) -> list[ParsedProduct]:
     tbody = soup.find(id="tbdy")
     if tbody is None:
@@ -115,38 +201,28 @@ def parse_products(soup: BeautifulSoup) -> list[ParsedProduct]:
         select = tr.find("select")
         if select is None:
             continue
-        for optgroup in select.find_all("optgroup"):
-            subcategory_name = optgroup.get("label", "").strip()
-            # 真實 HTML 的 <optgroup> 沒有對應的 </optgroup> 結束標籤；
-            # lxml 依 HTML5 規則本應在遇到下一個 <optgroup> 時隱式關閉前一個
-            # （使其成為兄弟節點），但實測會把後續每個 <optgroup> 都巢狀
-            # 解析進前一個 <optgroup> 內。若這裡用預設的 recursive=True，
-            # find_all("option") 會把子孫層所有巢狀 optgroup 的 <option>
-            # 也一併抓進來，導致同一個 <option> 被計入多個（外層）optgroup，
-            # 商品數暴增數十倍且 subcategory_name 被誤植為外層分類。
-            # 用 recursive=False 只取「緊接在這個 optgroup 開始標籤之後、
-            # 下一個巢狀 optgroup 之前」的 <option>，才是它真正對應的商品。
-            for opt in optgroup.find_all("option", recursive=False):
-                if opt.has_attr("disabled"):
-                    continue
-                if opt.get("value") == "0":
-                    continue
-                text = opt.get_text(strip=True)
-                if ", $" not in text:
-                    continue
-                try:
-                    name, price, badges = split_name_price_badges(text)
-                except ParseError:
-                    continue
-                status = extract_status(name)
-                products.append(ParsedProduct(
-                    category_name=category_name,
-                    subcategory_name=subcategory_name,
-                    name=name,
-                    price=price,
-                    status=status,
-                    badges=badges,
-                ))
+        for subcategory_name, opt in _iter_select_options(select):
+            if opt.has_attr("disabled"):
+                continue
+            if opt.get("value") == "0":
+                continue
+            text = opt.get_text(strip=True)
+            if ", $" not in text:
+                continue
+            try:
+                name, price, badges = split_name_price_badges(text)
+            except ParseError:
+                continue
+            name = strip_promo_deadline_suffix(name)
+            status = extract_status(name)
+            products.append(ParsedProduct(
+                category_name=category_name,
+                subcategory_name=subcategory_name,
+                name=name,
+                price=price,
+                status=status,
+                badges=badges,
+            ))
     return products
 
 
