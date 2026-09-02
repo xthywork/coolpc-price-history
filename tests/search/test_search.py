@@ -1,0 +1,154 @@
+import datetime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from coolpc.db.models import Base, Category, Subcategory, Product, ProductName
+from coolpc.search.service import SearchFilters, search_products
+
+def _session():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    return Session(engine)
+
+def _add(session, cat, sub, name, price, is_active, t, brand=None, model=None, last_change_amount=None):
+    p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name, brand=brand,
+                model=model, current_price=price, is_active=is_active, first_seen_at=t,
+                last_seen_at=t, created_at=t, last_change_amount=last_change_amount)
+    session.add(p)
+    session.flush()
+    session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
+    return p
+
+def test_search_by_keyword_matches_two_char_chinese_substring():
+    session = _session()
+    cat = Category(name="固態硬碟")
+    sub = Subcategory(name="NAS碟", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "Synology HAT3300 4TB【限搭NAS主機】", 6890, True, t)
+    _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(q="限搭"))
+    assert total == 1
+    assert results[0].current_name.startswith("Synology")
+
+def test_search_by_keyword_matches_three_plus_char_chinese_phrase():
+    """驗證 Task 4 的 FTS5 bigram 限制（僅支援 2 字查詢）不會影響本服務——
+    LIKE 子字串比對對任意長度中文詞都要正確。"""
+    session = _session()
+    cat = Category(name="固態硬碟")
+    sub = Subcategory(name="NAS碟", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "Synology HAT3300 4TB【限搭NAS主機】", 6890, True, t)
+    _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(q="限搭NAS主機"))
+    assert total == 1
+    assert results[0].current_name.startswith("Synology")
+
+def test_search_by_keyword_matches_old_name():
+    """舊名稱搜尋：查詢字串比對 product_names 全部歷史名稱，不只 current_name。"""
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    p = _add(session, cat, sub, "ASUS RTX 5070 PRIME OC 12GB", 19990, True, t)
+    session.add(ProductName(product_id=p.id, name="ASUS RTX 5070 PRIME 12G", first_seen_at=t, last_seen_at=t))
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(q="ASUS RTX 5070 PRIME 12G"))
+    assert total == 1
+    assert results[0].id == p.id
+
+def test_search_by_price_range_and_category():
+    session = _session()
+    cat1 = Category(name="顯示卡VGA")
+    cat2 = Category(name="固態硬碟")
+    sub1 = Subcategory(name="NVIDIA", category=cat1)
+    sub2 = Subcategory(name="NAS碟", category=cat2)
+    session.add_all([cat1, cat2, sub1, sub2])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat1, sub1, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    _add(session, cat1, sub1, "微星 RTX3050 VENTUS 2X E 6G OC", 7990, True, t)
+    _add(session, cat2, sub2, "Synology HAT3300 4TB", 6890, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(
+        category_id=cat1.id, min_price=10000,
+    ))
+    assert total == 1
+    assert results[0].current_name.startswith("ASUS")
+
+def test_search_by_model_substring():
+    session = _session()
+    cat = Category(name="品牌小主機、AIO｜VR虛擬")
+    sub = Subcategory(name="ASUS", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "ASUS【H-V500MV-31315U042W】i3-1315U", 13990, True, t,
+         model="H-V500MV-31315U042W")
+    _add(session, cat, sub, "ASUS【H-S503MER-714700001X】i7-14700", 33990, True, t,
+         model="H-S503MER-714700001X")
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(model="H-V500MV"))
+    assert total == 1
+    assert results[0].model == "H-V500MV-31315U042W"
+
+def test_search_excludes_merged_away_products():
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    source = _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, False, t)
+    target = _add(session, cat, sub, "ASUS RTX 5070 PRIME OC 12GB", 19990, True, t)
+    session.commit()
+    source.merged_into_id = target.id
+    session.commit()
+
+    results, total = search_products(session, SearchFilters())
+    assert total == 1
+    assert results[0].id == target.id
+
+def test_search_filters_recent_price_up():
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "漲價商品", 9000, True, t, last_change_amount=500)
+    _add(session, cat, sub, "降價商品", 9000, True, t, last_change_amount=-300)
+    session.commit()
+
+    up, up_total = search_products(session, SearchFilters(recent_change="up"))
+    down, down_total = search_products(session, SearchFilters(recent_change="down"))
+    assert up_total == 1 and up[0].current_name == "漲價商品"
+    assert down_total == 1 and down[0].current_name == "降價商品"
+
+def test_search_pagination():
+    session = _session()
+    cat = Category(name="C")
+    sub = Subcategory(name="S", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    for i in range(5):
+        _add(session, cat, sub, f"商品{i}", 1000 + i, True, t)
+    session.commit()
+
+    page1, total = search_products(session, SearchFilters(limit=2, offset=0, sort="name_asc"))
+    page2, _ = search_products(session, SearchFilters(limit=2, offset=2, sort="name_asc"))
+    assert total == 5
+    assert len(page1) == 2 and len(page2) == 2
+    assert {p.id for p in page1}.isdisjoint({p.id for p in page2})
