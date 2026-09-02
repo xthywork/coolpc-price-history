@@ -6,3 +6,4 @@ data/raw_html/
 .env
 *.egg-info/
 .pytest_cache/
+.superpowers/
