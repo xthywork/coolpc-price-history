@@ -755,6 +755,57 @@ def test_split_handles_arrow_before_comma_bundle_format_with_multiple_badges():
     assert price == 2788
     assert badges == "◆ ★"
 
+def test_split_handles_bare_old_price_before_arrow_bundle_format():
+    """真實資料第三種降價格式：原價完全沒有 $ 前綴，只有裸數字後面緊接箭頭，
+    常見於「組合優惠」整機搭購方案（例如「微星 Raider/Cyborg/Katana + 威剛
+    16G」系列）。例如 "...125290↘, $124000 ◆ ★"（原價 125290 沒有 $，
+    新價 124000 才有 $）。"""
+    name, price, badges = split_name_price_badges(
+        "【組合優惠】微星 Raider Ultra 9 黑 B2WI-025TW+威剛16G 125290↘, $124000 ◆ ★"
+    )
+    assert name == "【組合優惠】微星 Raider Ultra 9 黑 B2WI-025TW+威剛16G"
+    assert price == 124000
+    assert badges == "◆ ★"
+    assert "," not in name
+    assert "$" not in name
+    assert "↘" not in name
+
+def test_split_takes_final_price_across_chained_price_drops():
+    """真實資料存在連續兩次降價的情況（例如 BenQ 螢幕搭購方案），
+    例如 "...$3988↘, $3188↘$2988 ◆ ★"，必須取「最後」一次（最低）的價格
+    2988，而不是中間那次 3188，且 badges 不應殘留 "↘$2988" 之類的片段。"""
+    name, price, badges = split_name_price_badges(
+        "【主機搭購】BenQ GW2790〈2H1P/IPS/100Hz/含喇叭〉.光智慧2.0 $3988↘, $3188↘$2988 ◆ ★"
+    )
+    assert name == "【主機搭購】BenQ GW2790〈2H1P/IPS/100Hz/含喇叭〉.光智慧2.0"
+    assert price == 2988
+    assert badges == "◆ ★"
+
+def test_split_does_not_mis_split_on_embedded_dollar_sign_in_name():
+    """真實資料的重大陷阱：商品名稱本身就含有行銷用的「原價$1590」字樣
+    （$ 前面沒有逗號，只是緊貼在中文字後面，且沒有箭頭符號），例如
+    "...原價$1590, $1190 ◆ ★ 熱賣"。逗號才是唯一能區分「這是價格起點」
+    與「名稱裡剛好有個 $ 符號」的依據，所以沒有箭頭時，逗號必須是必要
+    （不可為可選），否則會把名稱內嵌的 "$1590" 誤判成價格（應為 1190）。"""
+    name, price, badges = split_name_price_badges(
+        "視博通 MW-III 顯卡長35/CPU高16.5/網孔面板+燈條/玻璃透側/E-ATX 原價$1590, $1190 ◆ ★ 熱賣"
+    )
+    assert name == "視博通 MW-III 顯卡長35/CPU高16.5/網孔面板+燈條/玻璃透側/E-ATX 原價$1590"
+    assert price == 1190
+    assert badges == "◆ ★ 熱賣"
+
+def test_split_handles_up_arrow_price_increase_warning():
+    """真實資料還有一種與「↘ 降價」對稱的「↗ 漲價預告」格式，
+    例如 "...(AD5U56008G-S), $2999↗$3099 ◆ ★"，常見於記憶體類商品，
+    提醒買家即將漲價。目前實際在賣的價格是箭頭「前」的 2999，
+    箭頭與未來價 3099 都應從 badges 消掉，不應殘留。"""
+    name, price, badges = split_name_price_badges(
+        "威剛 單條8GB D5-5600/CL46 (AD5U56008G-S), $2999↗$3099 ◆ ★"
+    )
+    assert name == "威剛 單條8GB D5-5600/CL46 (AD5U56008G-S)"
+    assert price == 2999
+    assert badges == "◆ ★"
+
 def test_extract_status_finds_in_stock():
     assert extract_status("GIGABYTE 連接線【現貨】") == "現貨"
 
@@ -779,26 +830,71 @@ Expected: FAIL，`ImportError: cannot import name 'split_name_price_badges'`
 
 ```python
 
-# 真實資料有兩種降價格式：
+# 真實資料的降價格式：
 #   1) "NAME, $原價↘$新價 標記"（逗號在原價之前，箭頭與新價之間無逗號）
 #   2) "NAME $原價↘, $新價 標記"（原價前無逗號，逗號在箭頭與新價之間，
 #      常見於「搭購」組合優惠）
-# 用 \s*,?\s*\$ 讓「逗號」在名稱與價格之間、以及箭頭與新價之間都是可選的，
-# 兩種格式都能正確切出名稱（不殘留價格片段）。
-NAME_PRICE_PATTERN = re.compile(r"^(.*?)\s*,?\s*\$([\d,]+)(?:↘\s*,?\s*\$([\d,]+))?\s*(.*)$", re.S)
+#   3) "NAME 原價(無 $ 前綴)↘, $新價 標記"（原價完全沒有 $ 符號，只有裸數字，
+#      常見於「組合優惠」整機搭購方案，如「微星 Raider/Cyborg/Katana + 威剛
+#      16G」系列）
+#   4) 連續降價："NAME $價1↘, $價2↘$價3 標記"（同一商品出現兩次以上的箭頭
+#      降價，須取「最後」一次的價格，例如 BenQ 螢幕的搭購方案）
+# 格式 3 的「裸數字」只有在後面緊接箭頭符號 ↘ 時才視為原價，避免誤吃一般
+# 商品名稱結尾剛好是數字（例如型號）但其實沒有降價的情況——箭頭字元在真實
+# 資料中只會出現在降價標記，是可靠的判斷依據。
+#
+# 全語料庫（842 份樣本）掃描曾發現一個更嚴重的真實案例：商品名稱本身就含有
+# 行銷用的「原價$1590」字樣（$ 前面沒有逗號，只是緊貼在中文字後面），例如
+# "...原價$1590, $1190 ◆ ★ 熱賣"。若把「NAME 前面的逗號」也設成可選
+# （之前 NAME_PRICE_PLAIN_PATTERN 曾經這樣做，是為了處理沒有箭頭的簡單案例
+# 誤帶入的舊假設），regex 會把名稱內嵌的 "$1590" 誤判成價格起點，切出錯誤
+# 的價格（1590 而非真正在賣的 1190）且把逗號之後的真正價格片段殘留進
+# badges。真正安全的判斷依據是：
+#   - 有箭頭（↘）時，箭頭本身就是可靠的價格標記，箭頭前的價格可以沒有逗號
+#     （對應格式 2/3/4）；
+#   - 沒有箭頭時，逗號是唯一能區分「這是價格起點」與「名稱裡剛好有個 $ 符號」
+#     的依據，因此逗號必須是必要（mandatory），不可省略。
+# 因此拆成兩個子規則，先試「有箭頭」規則（逗號可省略，但箭頭必要，且用
+# `(?:...)+` 讓箭頭段可重複出現、只保留最後一次的擷取值，處理格式 4 的連續
+# 降價），找不到才退回「無箭頭、逗號必要、純 $價錢」規則。
+NAME_PRICE_ARROW_PATTERN = re.compile(
+    r"^(.*?)\s*,?\s*(?:\$([\d,]+)|(\d[\d,]{2,}))(?:↘\s*,?\s*\$([\d,]+))+\s*(.*)$", re.S
+)
+# 另有一種與「↘ 降價」對稱的「↗ 漲價預告」格式："NAME, $現價↗$未來價 標記"
+# （現價前有逗號，箭頭與未來價之間沒有逗號），全語料庫掃描出現超過 5 萬次，
+# 常見於記憶體類商品（提醒買家即將漲價）。這裡取箭頭「前」的現價（也就是
+# 目前實際在賣的價格），並把箭頭與未來價一併從 badges 中消掉，避免殘留
+# "↗$3099" 這類價格片段污染 badges 欄位。掃描全語料庫確認 ↗ 與 ↘ 不會同時
+# 出現在同一段文字，也沒有連續多次 ↗ 的情況，所以不需要像 ↘ 一樣用可重複
+# 的 group。
+NAME_PRICE_UP_ARROW_PATTERN = re.compile(
+    r"^(.*?)\s*,?\s*\$([\d,]+)↗\s*,?\s*\$([\d,]+)\s*(.*)$", re.S
+)
+NAME_PRICE_PLAIN_PATTERN = re.compile(r"^(.*?),\s*\$([\d,]+)\s*(.*)$", re.S)
 STATUS_KEYWORDS = ["現貨", "訂", "客訂", "拆封品"]
 STATUS_BRACKET_PATTERN = re.compile(r"[【｛]([^】｝]*)[】｝]")
 
 
 def split_name_price_badges(option_text: str) -> tuple[str, int, str]:
     text = option_text.strip()
-    m = NAME_PRICE_PATTERN.match(text)
+    m = NAME_PRICE_ARROW_PATTERN.match(text)
+    if m:
+        name = m.group(1).strip()
+        price = int(m.group(4).replace(",", ""))
+        badges = m.group(5).strip()
+        return name, price, badges
+    m = NAME_PRICE_UP_ARROW_PATTERN.match(text)
+    if m:
+        name = m.group(1).strip()
+        price = int(m.group(2).replace(",", ""))
+        badges = m.group(4).strip()
+        return name, price, badges
+    m = NAME_PRICE_PLAIN_PATTERN.match(text)
     if not m:
         raise ParseError(f"無法從商品文字切出名稱/價格: {text!r}")
     name = m.group(1).strip()
-    final_price_str = m.group(3) or m.group(2)
-    price = int(final_price_str.replace(",", ""))
-    badges = m.group(4).strip()
+    price = int(m.group(2).replace(",", ""))
+    badges = m.group(3).strip()
     return name, price, badges
 
 
@@ -809,6 +905,9 @@ def extract_status(name: str) -> str | None:
             return content
     return None
 ```
+
+**（本區塊已依 Task 7 全語料庫回歸抽測發現的三個真實 bug 更新到最終狀態，
+細節見 Task 7 小節的說明；原始 Task 6 只實作了格式 1/2。）**
 
 - [ ] **Step 4: 執行測試確認通過**
 
@@ -877,6 +976,39 @@ def test_parse_html_excludes_disabled_and_summary_options():
 def test_parse_html_raises_parse_error_on_garbage():
     with pytest.raises(ParseError):
         parse_html(b"<html><body>not a coolpc page</body></html>")
+
+def test_parse_html_does_not_duplicate_options_across_nested_optgroups():
+    """真實 HTML 的 <optgroup> 沒有對應的 </optgroup> 結束標籤，lxml 會把後續
+    每個 <optgroup> 都巢狀解析進前一個 <optgroup> 內，而不是視為兄弟節點。
+    若用預設的 recursive=True 抓 <option>，同一個商品會被外層 optgroup 重複
+    計入，導致單一份快照的商品數暴增到十萬筆等級（實際應為數千筆）。這裡
+    驗證商品數量級合理，並且商品數應精確等於「未被停用且非彙總列(value=0)
+    的 <option> 總數」（獨立於 parse_products 邏輯之外直接統計得出），確認
+    沒有任何 <option> 被重複計入或漏算。"""
+    with open(SAMPLE, "rb") as f:
+        raw = f.read()
+    from coolpc.parser.html_parser import decode_html
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(decode_html(raw), "lxml")
+    tbody = soup.find(id="tbdy")
+    expected_candidate_count = 0
+    for tr in tbody.find_all("tr", recursive=False):
+        select = tr.find("select")
+        if select is None:
+            continue
+        for optgroup in select.find_all("optgroup"):
+            for opt in optgroup.find_all("option", recursive=False):
+                if opt.has_attr("disabled") or opt.get("value") == "0":
+                    continue
+                expected_candidate_count += 1
+
+    snapshot = parse_html(raw)
+
+    # 修正前約 10 萬筆（每個 option 被多個外層 optgroup 重複計入），
+    # 修正後應精確等於獨立統計出的候選 option 數量
+    assert len(snapshot.products) == expected_candidate_count
+    assert len(snapshot.products) < 20000
 ```
 
 - [ ] **Step 2: 執行測試確認失敗**
@@ -908,7 +1040,7 @@ def parse_products(soup: BeautifulSoup) -> list[ParsedProduct]:
             continue
         for optgroup in select.find_all("optgroup"):
             subcategory_name = optgroup.get("label", "").strip()
-            for opt in optgroup.find_all("option"):
+            for opt in optgroup.find_all("option", recursive=False):
                 if opt.has_attr("disabled"):
                     continue
                 if opt.get("value") == "0":
@@ -942,6 +1074,10 @@ def parse_html(raw_bytes: bytes) -> ParsedSnapshot:
     return ParsedSnapshot(fetched_at=fetched_at, products=products)
 ```
 
+**注意：`optgroup.find_all("option")` 這裡務必加上 `recursive=False`**
+（原始草稿沒有這個參數，是 Step 5 全語料庫回歸抽測發現的第一個 bug，見下方
+說明），否則單一份快照的商品數會暴增到十萬筆等級。
+
 - [ ] **Step 4: 執行測試確認通過**
 
 Run: `uv run pytest tests/parser/test_parse_html.py -v`
@@ -964,12 +1100,62 @@ for f in sample:
 
 Expected: 5 行輸出，皆無例外，商品數量皆為合理量級（數千筆）。
 
+**Step 5 實際執行結果：認真抽查後發現三個真實 bug，皆已修正並補上回歸測試
+（詳見 `src/coolpc/parser/html_parser.py` 與 `tests/parser/` 內的說明註解與
+測試案例）：**
+
+1. **`parse_products` 的巢狀 `<optgroup>` 重複計算 bug（本 Task 新增程式碼
+   本身的 bug）**：原價屋真實 HTML 的 `<optgroup>` 標籤沒有對應的
+   `</optgroup>` 結束標籤。lxml 依 HTML5 規則本應在遇到下一個 `<optgroup>`
+   時隱式關閉前一個（成為兄弟節點），但實測會把後續每個 `<optgroup>` 都
+   巢狀解析進前一個 `<optgroup>` 內。原始草稿用預設的 `recursive=True`
+   呼叫 `optgroup.find_all("option")`，導致同一個 `<option>` 被計入多個
+   （外層）optgroup，單一份快照的商品數從應有的數千筆暴增到約 10 萬筆
+   （超出 20 倍），且 `subcategory_name` 常被誤植為外層（更早出現）的
+   分類名稱。修正方式：改用 `recursive=False`，只取「緊接在這個
+   optgroup 開始標籤之後、下一個巢狀 optgroup 之前」的 `<option>`。
+   已於 842 份樣本全部驗證：修正後的商品數精確等於獨立統計出的候選
+   `<option>` 數量（無重複也無遺漏）。
+
+2. **`split_name_price_badges`（Task 6 遺留）對第三種降價格式
+   （原價無 `$` 前綴的裸數字，如「組合優惠」整機搭購方案）處理不到**：
+   全語料庫掃描發現 4 種商品、842 份樣本中累計 425 次出現，例如
+   "...125290↘, $124000 ◆ ★"。已改用「有箭頭 / 無箭頭」兩個子規則
+   處理（見 Task 6 小節最新版 regex），並支援連續兩次降價
+   （"...$3988↘, $3188↘$2988 ◆ ★" 需取最後一次價格 2988）。
+
+3. **`split_name_price_badges`（Task 6 遺留）對「名稱本身含有行銷用
+   `$` 字樣」誤判價格起點的嚴重 bug**：Task 6 審查時曾提出一個
+   「未確認的理論風險」——NAME_PRICE_PATTERN 把逗號設為可選
+   （`\s*,?\s*\$`）可能誤吃名稱裡剛好出現的裸 `$` 符號。全語料庫掃描
+   證實這個風險**確實會發生**，例如
+   "視博通 MW-III ... 原價$1590, $1190 ◆ ★ 熱賣" 會被誤判成
+   price=1590（名稱內嵌的行銷用「原價$1590」），而不是真正在賣的
+   1190，且逗號之後的真正價格片段殘留進 badges。這比前兩個 bug更嚴重，
+   因為它直接導致**價格資料本身錯誤**，而不只是名稱/badges 欄位有雜訊。
+   修正方式：拆成「有箭頭」（`NAME_PRICE_ARROW_PATTERN`，逗號可省略但箭頭
+   必要——箭頭字元本身是可靠的價格標記）與「無箭頭」
+   （`NAME_PRICE_PLAIN_PATTERN`，逗號恢復為必要）兩個子規則，因為沒有
+   箭頭時逗號是唯一能區分「這是價格起點」與「名稱裡剛好有個 $ 符號」的
+   依據。全語料庫驗證：修正後所有商品名稱中若仍含有 `$`（全語料庫僅 9
+   筆，皆為「原價$X」這類合法行銷文字），其擷取出的價格都與人工核對的
+   真實售價一致。
+
+   附帶發現並修正一個同源、但影響較小（不影響價格正確性，只影響 badges
+   欄位乾淨度）的第四個真實格式：與「↘ 降價」對稱的「↗ 漲價預告」格式
+   （"NAME, $現價↗$未來價 標記"，常見於記憶體類商品，提醒買家即將漲價，
+   全語料庫超過 5 萬次出現）。修正前這類商品的 badges 會殘留
+   "↗$3099 ◆ ★" 之類的價格片段；修正後正確取箭頭前的現價，badges 乾淨。
+
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/coolpc/parser/html_parser.py tests/parser/test_parse_html.py
 git commit -m "feat: parser - 完整快照解析整合入口 parse_html"
 ```
+
+之後另有一個 `fix:` commit 修正上述三個 Step 5 發現的 bug（含 Task 6
+regex 的相應更新與新增回歸測試）。
 
 ---
 
