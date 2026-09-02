@@ -37,8 +37,12 @@ def save_raw_html(raw_bytes: bytes, fetched_at: datetime.datetime,
                    base_dir: str = "data/raw_html") -> str:
     day_dir = os.path.join(base_dir, f"{fetched_at:%Y}", f"{fetched_at:%m}", f"{fetched_at:%d}")
     os.makedirs(day_dir, exist_ok=True)
-    filename = f"{fetched_at:%Y-%m-%d-%H-%M-%S}.html"
-    path = os.path.join(day_dir, filename)
-    with open(path, "wb") as f:
+    stem = f"{fetched_at:%Y-%m-%d-%H-%M-%S}"
+    path = os.path.join(day_dir, f"{stem}.html")
+    suffix = 0
+    while os.path.exists(path):
+        suffix += 1
+        path = os.path.join(day_dir, f"{stem}-{suffix}.html")
+    with open(path, "xb") as f:
         f.write(raw_bytes)
     return path
