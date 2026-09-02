@@ -737,6 +737,24 @@ def test_split_raises_on_malformed_text():
     with pytest.raises(ParseError):
         split_name_price_badges("這不是一個有效的商品字串")
 
+def test_split_handles_arrow_before_comma_bundle_format():
+    """真實資料另一種降價格式：逗號在箭頭之後而非之前（常見於「搭購」組合優惠），
+    例如 "...$2,799↘, $1499 ★"（原價前沒有逗號，逗號出現在箭頭與新價之間）。"""
+    name, price, badges = split_name_price_badges(
+        "【螢幕搭購】Raymii LS5U (單螢幕/穿夾兩用/高負重氣壓/17-43吋/承載18KG) $2,799↘, $1499 ★"
+    )
+    assert name == "【螢幕搭購】Raymii LS5U (單螢幕/穿夾兩用/高負重氣壓/17-43吋/承載18KG)"
+    assert price == 1499
+    assert badges == "★"
+
+def test_split_handles_arrow_before_comma_bundle_format_with_multiple_badges():
+    name, price, badges = split_name_price_badges(
+        "【主機搭購】PHILIPS 27E2G2200〈1H1P/IPS/144Hz/HDR10〉$2988↘, $2788 ◆ ★"
+    )
+    assert name == "【主機搭購】PHILIPS 27E2G2200〈1H1P/IPS/144Hz/HDR10〉"
+    assert price == 2788
+    assert badges == "◆ ★"
+
 def test_extract_status_finds_in_stock():
     assert extract_status("GIGABYTE 連接線【現貨】") == "現貨"
 
@@ -760,7 +778,14 @@ Expected: FAIL，`ImportError: cannot import name 'split_name_price_badges'`
 補在 `src/coolpc/parser/html_parser.py` 尾端：
 
 ```python
-NAME_PRICE_PATTERN = re.compile(r"^(.*?),\s*\$([\d,]+)(?:↘\$([\d,]+))?\s*(.*)$", re.S)
+
+# 真實資料有兩種降價格式：
+#   1) "NAME, $原價↘$新價 標記"（逗號在原價之前，箭頭與新價之間無逗號）
+#   2) "NAME $原價↘, $新價 標記"（原價前無逗號，逗號在箭頭與新價之間，
+#      常見於「搭購」組合優惠）
+# 用 \s*,?\s*\$ 讓「逗號」在名稱與價格之間、以及箭頭與新價之間都是可選的，
+# 兩種格式都能正確切出名稱（不殘留價格片段）。
+NAME_PRICE_PATTERN = re.compile(r"^(.*?)\s*,?\s*\$([\d,]+)(?:↘\s*,?\s*\$([\d,]+))?\s*(.*)$", re.S)
 STATUS_KEYWORDS = ["現貨", "訂", "客訂", "拆封品"]
 STATUS_BRACKET_PATTERN = re.compile(r"[【｛]([^】｝]*)[】｝]")
 
