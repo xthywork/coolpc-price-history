@@ -1,13 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session
-from coolpc.db.models import Category, Subcategory
+from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
-from coolpc.stats.service import compute_product_stats
+from coolpc.stats.service import compute_product_stats, get_price_history
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
@@ -83,4 +83,33 @@ def search_page(
         },
         "query_string": urlencode(query_params),
         "page": page, "total_pages": max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1), "total": total,
+    })
+
+
+@router.get("/products/{product_id}")
+def product_detail_page(request: Request, product_id: int, session: Session = Depends(get_session)):
+    product = session.get(Product, product_id)
+    if product is None or product.merged_into_id is not None:
+        raise HTTPException(status_code=404, detail="商品不存在")
+    category = session.get(Category, product.category_id)
+    subcategory = session.get(Subcategory, product.subcategory_id)
+    stats = compute_product_stats(session, product.id)
+    names = [
+        n.name for n in
+        session.query(ProductName).filter_by(product_id=product.id)
+        .order_by(ProductName.first_seen_at).all()
+    ]
+    history = list(reversed(get_price_history(session, product.id)))
+    same_category = (
+        session.query(Product)
+        .filter(Product.category_id == product.category_id, Product.id != product.id,
+                Product.merged_into_id.is_(None))
+        .order_by(Product.last_seen_at.desc())
+        .limit(20)
+        .all()
+    )
+    return templates.TemplateResponse(request, "product_detail.html", {
+        "product": product, "category": category, "subcategory": subcategory,
+        "stats": stats, "historical_names": names, "history": history,
+        "same_category_products": same_category,
     })
