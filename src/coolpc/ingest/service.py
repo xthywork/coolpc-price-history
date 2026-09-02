@@ -2,8 +2,8 @@ from __future__ import annotations
 import datetime
 import re
 from sqlalchemy.orm import Session
-from coolpc.db.models import Category, Subcategory, Product, ProductName, PriceHistory
-from coolpc.parser.models import ParsedProduct
+from coolpc.db.models import Category, Subcategory, Product, ProductName, PriceHistory, ScrapeSnapshot
+from coolpc.parser.models import ParsedProduct, ParsedSnapshot
 
 KNOWN_BRANDS = [
     "ASUS", "華碩", "微星", "MSI", "技嘉", "GIGABYTE", "酷碼", "ZOTAC", "INNO3D",
@@ -90,3 +90,54 @@ def ingest_product(
         badges=parsed.badges, scraped_at=fetched_at, snapshot_id=snapshot_id,
     ))
     return product, True, 0
+
+
+def ingest_snapshot(
+    session: Session,
+    parsed: ParsedSnapshot,
+    scrape_type: str,
+    raw_html_path: str | None,
+) -> ScrapeSnapshot:
+    snapshot = ScrapeSnapshot(
+        fetched_at=parsed.fetched_at, scrape_type=scrape_type,
+        raw_html_path=raw_html_path, status="success", error_message=None,
+        created_at=datetime.datetime.utcnow(),
+    )
+    session.add(snapshot)
+    session.flush()
+
+    total = new = up = down = 0
+    seen_product_ids: set[int] = set()
+
+    for parsed_product in parsed.products:
+        category = get_or_create_category(session, parsed_product.category_name)
+        subcategory = get_or_create_subcategory(session, category, parsed_product.subcategory_name)
+        product, is_new, price_delta = ingest_product(
+            session, parsed_product, category, subcategory, parsed.fetched_at, snapshot.id,
+        )
+        seen_product_ids.add(product.id)
+        total += 1
+        if is_new:
+            new += 1
+        elif price_delta > 0:
+            up += 1
+        elif price_delta < 0:
+            down += 1
+
+    delisted = 0
+    active_products = (
+        session.query(Product)
+        .filter(Product.is_active.is_(True), Product.merged_into_id.is_(None))
+        .all()
+    )
+    for product in active_products:
+        if product.id not in seen_product_ids:
+            product.is_active = False
+            delisted += 1
+
+    snapshot.total_products = total
+    snapshot.new_products = new
+    snapshot.delisted_products = delisted
+    snapshot.price_up_count = up
+    snapshot.price_down_count = down
+    return snapshot
