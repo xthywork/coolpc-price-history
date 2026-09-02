@@ -1,0 +1,16 @@
+[Unit]
+Description=CoolPC 管理介面服務
+After=network.target
+
+[Service]
+Type=simple
+User=coolpc
+Group=coolpc
+WorkingDirectory=/opt/coolpc-price-history
+Environment=COOLPC_DB_PATH=/opt/coolpc-price-history/data/coolpc.db
+ExecStart=/opt/coolpc-price-history/.venv/bin/uvicorn coolpc.admin_api.app:app --host 0.0.0.0 --port 33691
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

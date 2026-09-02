@@ -1,0 +1,12 @@
+[Unit]
+Description=CoolPC 價格歷史抓取（單次執行）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=coolpc
+Group=coolpc
+WorkingDirectory=/opt/coolpc-price-history
+Environment=COOLPC_DB_PATH=/opt/coolpc-price-history/data/coolpc.db
+ExecStart=/opt/coolpc-price-history/.venv/bin/coolpc-scraper scrape
