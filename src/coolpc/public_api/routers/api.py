@@ -93,7 +93,7 @@ def get_product_prices(
     session: Session = Depends(get_session),
 ):
     product = session.get(Product, product_id)
-    if product is None:
+    if product is None or product.merged_into_id is not None:
         raise HTTPException(status_code=404, detail="商品不存在")
     effective_start = start
     if days is not None and start is None:
@@ -105,7 +105,7 @@ def get_product_prices(
 @router.get("/products/{product_id}/stats", response_model=schemas.ProductStatsOut)
 def get_product_stats(product_id: int, session: Session = Depends(get_session)):
     product = session.get(Product, product_id)
-    if product is None:
+    if product is None or product.merged_into_id is not None:
         raise HTTPException(status_code=404, detail="商品不存在")
     stats = compute_product_stats(session, product_id)
     return schemas.ProductStatsOut(**stats.__dict__)

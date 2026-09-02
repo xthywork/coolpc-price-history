@@ -114,3 +114,72 @@ def test_get_product_stats_endpoint():
     resp = client.get(f"/api/products/{pid}/stats")
     assert resp.status_code == 200
     assert resp.json()["all_time_low"] == 500
+
+
+def test_get_product_prices_404_for_merged_away_source():
+    # Regression test: querying /prices with a merged-away SOURCE product's own id
+    # must 404, not silently return that source's stale pre-merge history.
+    # get_merged_group_product_ids is directional (finds products whose
+    # merged_into_id == the given id), so passing the source's own id resolves to
+    # just [source_id] alone, excluding the target's real/current data.
+    client, Session_ = _make_client()
+    t0 = datetime.datetime(2026, 2, 1)
+    t1 = datetime.datetime(2026, 2, 2)
+    with Session_() as session:
+        cat = Category(name="C")
+        sub = Subcategory(name="S", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Target",
+                          current_price=200, is_active=True, first_seen_at=t0, last_seen_at=t1,
+                          created_at=t0)
+        session.add(target)
+        session.flush()
+        source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Source (merged)",
+                          current_price=999, is_active=False, first_seen_at=t0, last_seen_at=t0,
+                          created_at=t0, merged_into_id=target.id)
+        session.add(source)
+        session.flush()
+        session.add_all([
+            PriceHistory(product_id=source.id, price=999, status=None, badges="",
+                          scraped_at=t0, snapshot_id=1),
+            PriceHistory(product_id=target.id, price=200, status=None, badges="",
+                          scraped_at=t1, snapshot_id=2),
+        ])
+        session.commit()
+        source_id = source.id
+
+    resp = client.get(f"/api/products/{source_id}/prices")
+    assert resp.status_code == 404
+
+
+def test_get_product_stats_404_for_merged_away_source():
+    client, Session_ = _make_client()
+    t0 = datetime.datetime(2026, 2, 1)
+    t1 = datetime.datetime(2026, 2, 2)
+    with Session_() as session:
+        cat = Category(name="C")
+        sub = Subcategory(name="S", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Target",
+                          current_price=200, is_active=True, first_seen_at=t0, last_seen_at=t1,
+                          created_at=t0)
+        session.add(target)
+        session.flush()
+        source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Source (merged)",
+                          current_price=999, is_active=False, first_seen_at=t0, last_seen_at=t0,
+                          created_at=t0, merged_into_id=target.id)
+        session.add(source)
+        session.flush()
+        session.add_all([
+            PriceHistory(product_id=source.id, price=999, status=None, badges="",
+                          scraped_at=t0, snapshot_id=1),
+            PriceHistory(product_id=target.id, price=200, status=None, badges="",
+                          scraped_at=t1, snapshot_id=2),
+        ])
+        session.commit()
+        source_id = source.id
+
+    resp = client.get(f"/api/products/{source_id}/stats")
+    assert resp.status_code == 404
