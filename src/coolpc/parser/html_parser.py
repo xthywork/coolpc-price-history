@@ -9,9 +9,9 @@ MDY_PATTERN = re.compile(r"(\d{4})/(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2})")
 
 def decode_html(raw_bytes: bytes) -> str:
     try:
-        return raw_bytes.decode("big5", errors="replace")
+        return raw_bytes.decode("cp950", errors="replace")
     except LookupError as exc:
-        raise ParseError(f"無法以 Big5 解碼: {exc}") from exc
+        raise ParseError(f"無法以 Big5 (cp950) 解碼: {exc}") from exc
 
 
 def parse_fetched_at(soup: BeautifulSoup) -> datetime.datetime:
