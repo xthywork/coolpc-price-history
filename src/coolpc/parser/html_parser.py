@@ -25,7 +25,13 @@ def parse_fetched_at(soup: BeautifulSoup) -> datetime.datetime:
     return datetime.datetime(year, month, day, hour, minute)
 
 
-NAME_PRICE_PATTERN = re.compile(r"^(.*?),\s*\$([\d,]+)(?:↘\$([\d,]+))?\s*(.*)$", re.S)
+# 真實資料有兩種降價格式：
+#   1) "NAME, $原價↘$新價 標記"（逗號在原價之前，箭頭與新價之間無逗號）
+#   2) "NAME $原價↘, $新價 標記"（原價前無逗號，逗號在箭頭與新價之間，
+#      常見於「搭購」組合優惠）
+# 用 \s*,?\s*\$ 讓「逗號」在名稱與價格之間、以及箭頭與新價之間都是可選的，
+# 兩種格式都能正確切出名稱（不殘留價格片段）。
+NAME_PRICE_PATTERN = re.compile(r"^(.*?)\s*,?\s*\$([\d,]+)(?:↘\s*,?\s*\$([\d,]+))?\s*(.*)$", re.S)
 STATUS_KEYWORDS = ["現貨", "訂", "客訂", "拆封品"]
 STATUS_BRACKET_PATTERN = re.compile(r"[【｛]([^】｝]*)[】｝]")
 
