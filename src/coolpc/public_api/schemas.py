@@ -34,3 +34,39 @@ class ProductListPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ProductStatsOut(BaseModel):
+    current_price: int
+    previous_price: int | None
+    change_amount: int | None
+    change_percent: float | None
+    low_7d: int | None
+    high_7d: int | None
+    low_30d: int | None
+    high_30d: int | None
+    low_90d: int | None
+    high_90d: int | None
+    all_time_low: int
+    all_time_high: int
+
+
+class ProductDetail(BaseModel):
+    id: int
+    current_name: str
+    historical_names: list[str]
+    category_name: str
+    subcategory_name: str
+    current_price: int
+    previous_price: int | None
+    change_amount: int | None
+    change_percent: float | None
+    first_seen_at: datetime.datetime
+    last_seen_at: datetime.datetime
+    is_active: bool
+    stats: ProductStatsOut
+
+
+class PricePoint(BaseModel):
+    scraped_at: datetime.datetime
+    price: int
