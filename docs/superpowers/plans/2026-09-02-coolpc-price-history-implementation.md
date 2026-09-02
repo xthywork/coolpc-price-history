@@ -3686,7 +3686,12 @@ def get_product_prices(
     session: Session = Depends(get_session),
 ):
     product = session.get(Product, product_id)
-    if product is None:
+    # merged_into_id 不為 None 代表這是已被合併走的來源商品；
+    # get_price_history 對它做 get_merged_group_product_ids 會找不到任何
+    # 「merged_into_id == product_id」的商品（那個關係只對 target 成立），
+    # 導致靜默回傳這個來源商品自己殘留的舊資料而非合併後的完整歷史，
+    # 是會誤導呼叫端的錯誤資料，因此和商品詳細頁一樣一律視為不存在。
+    if product is None or product.merged_into_id is not None:
         raise HTTPException(status_code=404, detail="商品不存在")
     effective_start = start
     if days is not None and start is None:
@@ -3698,7 +3703,9 @@ def get_product_prices(
 @router.get("/products/{product_id}/stats", response_model=schemas.ProductStatsOut)
 def get_product_stats(product_id: int, session: Session = Depends(get_session)):
     product = session.get(Product, product_id)
-    if product is None:
+    # 同上：已合併走的商品在這裡查 stats 會得到自己殘留的舊資料而非合併後
+    # 的正確統計，一律視為不存在，避免回傳看似正常但實際錯誤的 200 回應。
+    if product is None or product.merged_into_id is not None:
         raise HTTPException(status_code=404, detail="商品不存在")
     stats = compute_product_stats(session, product_id)
     return schemas.ProductStatsOut(**stats.__dict__)
