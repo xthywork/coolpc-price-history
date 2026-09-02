@@ -17,6 +17,24 @@ def test_compute_similarity_low_for_unrelated():
     score = compute_similarity("ASUS RTX 5070 PRIME 12G", "Kingston 隨身碟 64GB")
     assert score < 0.3
 
+def test_normalize_name_preserves_parenthesized_spec_text():
+    # () 內常裝真正具區別意義的規格文字（超頻頻率/散熱器長度/風扇數等），
+    # 不可當雜訊整段移除，否則不同 SKU 會被誤判為相同名稱。
+    a = "Acer Nitro ARC B580 OC 12GB(2740MHz/27cm/雙風扇/註三年)"
+    b = "Acer Nitro ARC B580 OC 12GB(2600MHz/24cm/三風扇/註三年)"
+    assert normalize_name(a) != normalize_name(b)
+
+def test_compute_similarity_distinguishes_different_paren_specs():
+    # 括號內容保留後，兩者仍非常相似（同型號、僅超頻/散熱規格不同），
+    # 但分數必須明顯低於 1.0（完全相同），才不會把不同 SKU 誤判為同一商品
+    # 改名。不要求低於 SIMILARITY_THRESHOLD——這兩個確實是相似度高的
+    # 候選，該由人工審核判斷是否為不同 SKU，而非被系統當成同一商品直接
+    # 忽略差異（分數為 1.0 才是原始 bug 的徵狀）。
+    a = "Acer Nitro ARC B580 OC 12GB(2740MHz/27cm/雙風扇/註三年)"
+    b = "Acer Nitro ARC B580 OC 12GB(2600MHz/24cm/三風扇/註三年)"
+    score = compute_similarity(a, b)
+    assert score < 1.0
+
 def _session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
