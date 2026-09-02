@@ -14,7 +14,10 @@ class ScraperLock:
             fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             if self._is_stale():
-                os.remove(self.lock_path)
+                try:
+                    os.remove(self.lock_path)
+                except FileNotFoundError:
+                    pass
                 return self.acquire()
             return False
         with os.fdopen(fd, "w") as f:
