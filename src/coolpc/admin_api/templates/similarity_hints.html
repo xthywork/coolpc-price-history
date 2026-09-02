@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}可能需要合併的商品 - 原價屋管理介面{% endblock %}
+{% block content %}
+<h1>可能需要合併的商品</h1>
+<form method="post" action="/similarity-hints/refresh">
+  <button type="submit">重新計算相似度候選</button>
+</form>
+<p>以下為系統依名稱相似度找出的候選，僅供參考，請至 <a href="/merge">合併商品</a> 頁面手動確認後才會實際合併。</p>
+<table>
+  <thead><tr><th>相似度</th><th>商品 A</th><th>商品 B</th><th>操作</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ "%.0f"|format(row.hint.score * 100) }}%</td>
+      <td>#{{ row.a.id }} {{ row.a.current_name }}</td>
+      <td>#{{ row.b.id }} {{ row.b.current_name }}</td>
+      <td>
+        <form method="post" action="/similarity-hints/{{ row.hint.id }}/dismiss" style="display:inline">
+          <button type="submit">不是同一商品，忽略</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
