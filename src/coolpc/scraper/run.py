@@ -1,5 +1,7 @@
 from __future__ import annotations
 import datetime
+import glob
+import os
 from sqlalchemy.orm import sessionmaker, Session
 from coolpc.db.session import get_engine, get_session_factory
 from coolpc.db.models import ScrapeSnapshot
@@ -65,3 +67,30 @@ def run_scrape(
                 return _record_failure(session_factory, scrape_type, str(exc), raw_html_path)
     finally:
         lock.release()
+
+
+def import_html_file(path: str, session_factory: sessionmaker[Session] | None = None) -> ScrapeSnapshot:
+    session_factory = session_factory or get_session_factory(get_engine())
+    with open(path, "rb") as f:
+        raw_bytes = f.read()
+    try:
+        parsed = parse_html(raw_bytes)
+    except ParseError as exc:
+        return _record_failure(session_factory, "import", str(exc), path)
+
+    with session_factory() as session:
+        try:
+            snapshot = ingest_snapshot(session, parsed, "import", path)
+            session.commit()
+            session.refresh(snapshot)
+            return snapshot
+        except Exception as exc:
+            session.rollback()
+            return _record_failure(session_factory, "import", str(exc), path)
+
+
+def import_html_dir(dir_path: str,
+                     session_factory: sessionmaker[Session] | None = None) -> list[ScrapeSnapshot]:
+    session_factory = session_factory or get_session_factory(get_engine())
+    files = sorted(glob.glob(os.path.join(dir_path, "**", "*.html"), recursive=True))
+    return [import_html_file(path, session_factory=session_factory) for path in files]
