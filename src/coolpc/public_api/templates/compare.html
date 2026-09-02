@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}商品比較 - 原價屋歷史價格查詢{% endblock %}
+{% block content %}
+<h1>商品比較</h1>
+<form method="get" action="/compare">
+  <input type="text" name="ids" placeholder="輸入商品 ID，以逗號分隔，如 1,2,3" value="{{ ids }}">
+  <button type="submit">比較</button>
+</form>
+
+{% if error %}<p style="color:#b91c1c">{{ error }}</p>{% endif %}
+
+{% if items %}
+<table>
+  <thead>
+    <tr>
+      <th>商品</th><th>現價</th><th>7天最低</th><th>30天最低</th><th>30天最高</th>
+      <th>歷史最低</th><th>歷史最高</th><th>最近漲跌</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td><a href="/products/{{ item.product.id }}">{{ item.product.current_name }}</a></td>
+      <td>${{ "{:,}".format(item.product.current_price) }}</td>
+      <td>{{ item.stats.low_7d or "-" }}</td>
+      <td>{{ item.stats.low_30d or "-" }}</td>
+      <td>{{ item.stats.high_30d or "-" }}</td>
+      <td>${{ "{:,}".format(item.stats.all_time_low) }}</td>
+      <td>${{ "{:,}".format(item.stats.all_time_high) }}</td>
+      <td>{% if item.stats.change_amount %}{{ "%+d"|format(item.stats.change_amount) }} ({{ "%.1f"|format(item.stats.change_percent) }}%){% else %}-{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<canvas id="compareChart" height="100"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const productIds = [{% for item in items %}{{ item.product.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+const colors = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed'];
+
+async function loadCompareChart() {
+  const seriesList = [];
+  for (const pid of productIds) {
+    const resp = await fetch(`/api/products/${pid}/prices`);
+    seriesList.push(await resp.json());
+  }
+  const labelSet = new Set();
+  seriesList.forEach(series => series.forEach(pt => labelSet.add(pt.scraped_at)));
+  const labels = Array.from(labelSet).sort();
+
+  const datasets = seriesList.map((series, i) => {
+    const priceByTime = Object.fromEntries(series.map(pt => [pt.scraped_at, pt.price]));
+    return {
+      label: `商品 ${productIds[i]}`,
+      data: labels.map(l => (l in priceByTime ? priceByTime[l] : null)),
+      borderColor: colors[i % colors.length],
+      spanGaps: true,
+      fill: false,
+    };
+  });
+
+  const ctx = document.getElementById('compareChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      scales: {
+        x: { title: { display: true, text: '日期 / 時間' } },
+        y: { title: { display: true, text: '價格 TWD' } },
+      },
+    },
+  });
+}
+loadCompareChart();
+</script>
+{% endif %}
+{% endblock %}

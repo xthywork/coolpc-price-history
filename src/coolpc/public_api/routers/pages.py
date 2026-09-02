@@ -113,3 +113,29 @@ def product_detail_page(request: Request, product_id: int, session: Session = De
         "stats": stats, "historical_names": names, "history": history,
         "same_category_products": same_category,
     })
+
+
+@router.get("/compare")
+def compare_page(request: Request, ids: str | None = None, session: Session = Depends(get_session)):
+    items = []
+    error = None
+    if ids:
+        try:
+            product_ids = [int(x) for x in ids.split(",") if x.strip()]
+        except ValueError:
+            product_ids = []
+            error = "ids 格式錯誤，請輸入逗號分隔的商品 ID"
+        if error is None and not (2 <= len(product_ids) <= 5):
+            error = "請選擇 2 到 5 個商品進行比較"
+        if error is None:
+            for pid in product_ids:
+                product = session.get(Product, pid)
+                if product is None or product.merged_into_id is not None:
+                    error = f"商品不存在: {pid}"
+                    items = []
+                    break
+                items.append({"product": product, "stats": compute_product_stats(session, pid)})
+
+    return templates.TemplateResponse(request, "compare.html", {
+        "items": items, "ids": ids or "", "error": error,
+    })
