@@ -109,3 +109,31 @@ def get_product_stats(product_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="商品不存在")
     stats = compute_product_stats(session, product_id)
     return schemas.ProductStatsOut(**stats.__dict__)
+
+
+@router.get("/compare", response_model=schemas.CompareResult)
+def compare_products(ids: str, session: Session = Depends(get_session)):
+    try:
+        product_ids = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ids 格式錯誤，需為逗號分隔的整數")
+    if not (2 <= len(product_ids) <= 5):
+        raise HTTPException(status_code=400, detail="比較商品數量需介於 2 到 5 個之間")
+
+    items: list[schemas.CompareItem] = []
+    series: list[schemas.ComparePricePoint] = []
+    for pid in product_ids:
+        product = session.get(Product, pid)
+        if product is None or product.merged_into_id is not None:
+            raise HTTPException(status_code=404, detail=f"商品不存在: {pid}")
+        stats = compute_product_stats(session, pid)
+        items.append(schemas.CompareItem(
+            id=product.id, current_name=product.current_name, current_price=product.current_price,
+            low_7d=stats.low_7d, low_30d=stats.low_30d, high_30d=stats.high_30d,
+            all_time_low=stats.all_time_low, all_time_high=stats.all_time_high,
+            change_amount=stats.change_amount, change_percent=stats.change_percent,
+        ))
+        for h in get_price_history(session, pid):
+            series.append(schemas.ComparePricePoint(product_id=pid, scraped_at=h.scraped_at, price=h.price))
+
+    return schemas.CompareResult(items=items, series=series)

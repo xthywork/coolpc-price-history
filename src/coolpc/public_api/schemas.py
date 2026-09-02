@@ -70,3 +70,27 @@ class ProductDetail(BaseModel):
 class PricePoint(BaseModel):
     scraped_at: datetime.datetime
     price: int
+
+
+class CompareItem(BaseModel):
+    id: int
+    current_name: str
+    current_price: int
+    low_7d: int | None
+    low_30d: int | None
+    high_30d: int | None
+    all_time_low: int
+    all_time_high: int
+    change_amount: int | None
+    change_percent: float | None
+
+
+class ComparePricePoint(BaseModel):
+    product_id: int
+    scraped_at: datetime.datetime
+    price: int
+
+
+class CompareResult(BaseModel):
+    items: list[CompareItem]
+    series: list[ComparePricePoint]
