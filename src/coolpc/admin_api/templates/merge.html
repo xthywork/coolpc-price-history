@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}合併商品 - 原價屋管理介面{% endblock %}
+{% block content %}
+<h1>合併商品</h1>
+{% if message %}<p style="color:#15803d">{{ message }}</p>{% endif %}
+{% if error %}<p style="color:#b91c1c">{{ error }}</p>{% endif %}
+
+<form method="post" action="/merge">
+  來源商品 ID（將被合併，舊名稱仍可搜尋）：<input type="number" name="source_id" required>
+  目標商品 ID（合併後保留的主商品，請選擇目前仍持續更新的商品）：<input type="number" name="target_id" required>
+  <button type="submit">合併</button>
+</form>
+
+<h2>合併紀錄</h2>
+<table>
+  <thead><tr><th>時間</th><th>來源</th><th>目標</th><th>狀態</th><th>操作</th></tr></thead>
+  <tbody>
+    {% for row in log_rows %}
+    <tr>
+      <td>{{ row.log.merged_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td>{{ row.source.current_name if row.source else "?" }} (#{{ row.log.source_product_id }})</td>
+      <td>{{ row.target.current_name if row.target else "?" }} (#{{ row.log.target_product_id }})</td>
+      <td>{{ "已復原" if row.log.undone_at else "已合併" }}</td>
+      <td>
+        {% if not row.log.undone_at %}
+        <form method="post" action="/merge/{{ row.log.id }}/undo" style="display:inline">
+          <button type="submit">Undo</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}商品搜尋 - 原價屋管理介面{% endblock %}
+{% block content %}
+<h1>商品搜尋</h1>
+<form method="get" action="/products">
+  <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱" value="{{ query.q }}">
+  <select name="category_id">
+    <option value="">全部分類</option>
+    {% for c in categories %}
+    <option value="{{ c.id }}" {% if query.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">搜尋</button>
+</form>
+<p>共 {{ total }} 筆（僅顯示前 100 筆）</p>
+<table>
+  <thead><tr><th>ID</th><th>商品名稱</th><th>現價</th><th>狀態</th><th>最後更新</th></tr></thead>
+  <tbody>
+    {% for p in products %}
+    <tr>
+      <td>{{ p.id }}</td>
+      <td>{{ p.current_name }}</td>
+      <td>${{ "{:,}".format(p.current_price) }}</td>
+      <td>{{ "在售" if p.is_active else "已下架" }}</td>
+      <td>{{ p.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p>複製要合併的商品 ID，到 <a href="/merge">合併商品</a> 頁面操作。</p>
+{% endblock %}
