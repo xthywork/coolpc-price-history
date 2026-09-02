@@ -2698,8 +2698,10 @@ git commit -m "feat: stats - 價格統計計算（含合併商品聯集）"
 - Test: `tests/search/test_search.py`
 
 **Interfaces:**
-- Consumes: `Product`（Task 2）；`products_fts` 虛擬表（Task 4）
+- Consumes: `Product, ProductName`（Task 2）
 - Produces: `SearchFilters` dataclass（`q, category_id, subcategory_id, brand, min_price, max_price, is_active, recent_change, min_change_percent, max_change_percent, sort, limit, offset`）；`search_products(session, filters: SearchFilters) -> tuple[list[Product], int]`（商品清單, 總筆數）。供 Task 18（`/api/products`）、Task 23（管理介面商品搜尋）使用。
+
+**設計變更說明（取代原先以 FTS5 做關鍵字搜尋的設計）：** Task 4 建立 `products_fts` 時發現 SQLite FTS5 內建 tokenizer（`unicode61`／`trigram`）都無法正確處理任意長度的中文子字串查詢（`unicode61` 會把連續中文字黏成一個 token；`trigram` 要求查詢字串至少 3 字），Task 4 為了讓自己的測試（2 字中文查詢）通過而改用 2-gram 索引，但這代表「查詢端」若要沿用 `MATCH`，還需要對查詢字串做對應的 bigram 切分才能正確比對 3 字以上的中文詞——這已超出原計畫範圍。改用 `ProductName.name LIKE '%'||q||'%'` 直接做子字串查詢：對這個系統的資料量級（數千到數萬筆商品名稱）而言，即使 `LIKE '%...%'` 無法用到索引、需要全表掃描，效能仍然足夠（毫秒等級），且對中英文查詢（任意長度）都保證正確，不必處理 tokenizer 的邊界案例。`products_fts` 虛擬表本身維持已完成、已測試的狀態留在資料庫中（Task 4 的工作不需要撤銷），只是本任務起不再依賴它做搜尋。
 
 - [ ] **Step 1: 寫失敗測試**
 
@@ -2708,18 +2710,12 @@ git commit -m "feat: stats - 價格統計計算（含合併商品聯集）"
 import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from coolpc.db.models import Base, Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
 
 def _session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    # 測試環境用 SQLAlchemy metadata.create_all 不會跑 Alembic migration，
-    # 因此手動建立 FTS5 表以模擬正式環境（正式環境由 migration 0002 建立）。
-    engine.connect().execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    )).close()
     return Session(engine)
 
 def _add(session, cat, sub, name, price, is_active, t, brand=None, model=None, last_change_amount=None):
@@ -2729,11 +2725,9 @@ def _add(session, cat, sub, name, price, is_active, t, brand=None, model=None, l
     session.add(p)
     session.flush()
     session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
-    session.execute(text("INSERT INTO products_fts(product_id, name) VALUES (:pid, :name)"),
-                     {"pid": p.id, "name": name})
     return p
 
-def test_search_by_keyword_matches_fts():
+def test_search_by_keyword_matches_two_char_chinese_substring():
     session = _session()
     cat = Category(name="固態硬碟")
     sub = Subcategory(name="NAS碟", category=cat)
@@ -2747,6 +2741,39 @@ def test_search_by_keyword_matches_fts():
     results, total = search_products(session, SearchFilters(q="限搭"))
     assert total == 1
     assert results[0].current_name.startswith("Synology")
+
+def test_search_by_keyword_matches_three_plus_char_chinese_phrase():
+    """驗證 Task 4 的 FTS5 bigram 限制（僅支援 2 字查詢）不會影響本服務——
+    LIKE 子字串比對對任意長度中文詞都要正確。"""
+    session = _session()
+    cat = Category(name="固態硬碟")
+    sub = Subcategory(name="NAS碟", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "Synology HAT3300 4TB【限搭NAS主機】", 6890, True, t)
+    _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(q="限搭NAS主機"))
+    assert total == 1
+    assert results[0].current_name.startswith("Synology")
+
+def test_search_by_keyword_matches_old_name():
+    """舊名稱搜尋：查詢字串比對 product_names 全部歷史名稱，不只 current_name。"""
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    p = _add(session, cat, sub, "ASUS RTX 5070 PRIME OC 12GB", 19990, True, t)
+    session.add(ProductName(product_id=p.id, name="ASUS RTX 5070 PRIME 12G", first_seen_at=t, last_seen_at=t))
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(q="ASUS RTX 5070 PRIME 12G"))
+    assert total == 1
+    assert results[0].id == p.id
 
 def test_search_by_price_range_and_category():
     session = _session()
@@ -2847,9 +2874,8 @@ Expected: FAIL，`ModuleNotFoundError`
 # src/coolpc/search/service.py
 from __future__ import annotations
 from dataclasses import dataclass
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-from coolpc.db.models import Product
+from coolpc.db.models import Product, ProductName
 
 
 @dataclass
@@ -2882,11 +2908,13 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
 
     if filters.q:
-        rows = session.execute(
-            text("SELECT DISTINCT product_id FROM products_fts WHERE products_fts MATCH :q"),
-            {"q": filters.q},
-        ).fetchall()
-        matched_ids = [r[0] for r in rows]
+        matched_ids = [
+            row[0] for row in
+            session.query(ProductName.product_id)
+            .filter(ProductName.name.like(f"%{filters.q}%"))
+            .distinct()
+            .all()
+        ]
         if not matched_ids:
             return [], 0
         query = query.filter(Product.id.in_(matched_ids))
@@ -2966,11 +2994,6 @@ from coolpc.public_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -3011,8 +3034,6 @@ def _seed_product(Session_, name, price, category_name="顯示卡VGA", subcatego
         session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
         session.add(PriceHistory(product_id=p.id, price=price, status=None, badges="",
                                   scraped_at=t, snapshot_id=1))
-        session.execute(text("INSERT INTO products_fts(product_id, name) VALUES (:pid, :name)"),
-                         {"pid": p.id, "name": name})
         session.commit()
         return p.id
 
@@ -3263,11 +3284,6 @@ from coolpc.public_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -3516,11 +3532,6 @@ from coolpc.public_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -3699,11 +3710,6 @@ from coolpc.public_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -3732,8 +3738,6 @@ def test_search_page_renders_seeded_product():
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
         session.add(PriceHistory(product_id=p.id, price=18990, status=None, badges="",
                                   scraped_at=t, snapshot_id=1))
-        session.execute(text("INSERT INTO products_fts(product_id, name) VALUES (:pid, :name)"),
-                         {"pid": p.id, "name": p.current_name})
         session.commit()
 
     resp = client.get("/")
@@ -4035,11 +4039,6 @@ from coolpc.public_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -4308,11 +4307,6 @@ from coolpc.public_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -4834,11 +4828,6 @@ from coolpc.admin_api.dependencies import get_session
 def _make_client():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.close()
     TestingSession = sessionmaker(bind=engine)
 
     def override_get_session():
@@ -5479,44 +5468,42 @@ git commit -m "feat: 新增 systemd 部署檔案（scraper timer、public/admin 
 - Create: `tests/test_regression_real_html.py`
 
 **Interfaces:**
-- Consumes: `parse_html`（Task 7）；`ingest_snapshot`（Task 9）；全部真實樣本 `/home/xthybot/coolpc/download/*.html`
+- Consumes: `parse_html`（Task 7）；`ingest_snapshot`（Task 9）；全部真實樣本 `/home/xthybot/coolpc/download/*.html`；實際的 Alembic migration chain（Task 3+4，用 `alembic upgrade head` 而非 `Base.metadata.create_all` 建庫，確保驗證的是正式環境真正會跑的 schema，包含 Task 4 實際的 bigram FTS5 觸發器）
 - Produces: 一份端對端回歸測試，驗證解析→接入的完整流程在真實資料上長期運作不出錯、不遺失資料、FTS 索引與比對邏輯正確運作。
+
+**注意（延續 Task 4 的裁決）：** Task 4 為了讓中文子字串搜尋正確，把每筆 `product_names` 索引成「整串原文 + 每個重疊 2-gram」多筆 `products_fts` 記錄，不是 1 筆對 1 筆。本任務原本假設 `products_fts` 筆數會等於 `product_names` 筆數，這個假設不成立，下方測試已改為驗證「觸發器有確實產生記錄且不遺漏」而非精確筆數相等。同時本測試改為透過真正的 `alembic upgrade head`（跟 Task 4 自己的測試一樣用 subprocess 跑）建立資料庫，而不是手刻一個簡化版觸發器，這樣才是真正驗證 Task 4 實際寫的觸發器邏輯，而不是驗證一份重複但過時的複製品。
 
 - [ ] **Step 1: 寫失敗測試**
 
 ```python
 # tests/test_regression_real_html.py
 import glob
+import os
+import subprocess
+import sys
 from sqlalchemy import create_engine, text, func
 from sqlalchemy.orm import Session
-from coolpc.db.models import Base, Product, ProductName, PriceHistory, Category
+from coolpc.db.models import Product, ProductName, PriceHistory, Category
 from coolpc.parser.html_parser import parse_html
 from coolpc.ingest.service import ingest_snapshot
 
 SAMPLE_DIR = "/home/xthybot/coolpc/download"
 
 
-def _session():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    conn = engine.connect()
-    conn.execute(text(
-        "CREATE VIRTUAL TABLE products_fts USING fts5(product_id UNINDEXED, name, tokenize='unicode61')"
-    ))
-    conn.execute(text("""
-        CREATE TRIGGER product_names_ai AFTER INSERT ON product_names BEGIN
-            INSERT INTO products_fts(product_id, name) VALUES (new.product_id, new.name);
-        END
-    """))
-    conn.close()
+def _session(tmp_path):
+    db_path = tmp_path / "regression.db"
+    env = os.environ.copy()
+    env["COOLPC_DB_PATH"] = str(db_path)
+    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True, env=env)
+    engine = create_engine(f"sqlite:///{db_path}")
     return Session(engine)
 
 
-def test_import_real_chronological_sequence_without_errors_or_data_loss():
+def test_import_real_chronological_sequence_without_errors_or_data_loss(tmp_path):
     files = sorted(glob.glob(f"{SAMPLE_DIR}/*.html"))[:40]
     assert len(files) == 40
 
-    session = _session()
+    session = _session(tmp_path)
     snapshots = []
     for path in files:
         with open(path, "rb") as f:
@@ -5547,9 +5534,16 @@ def test_import_real_chronological_sequence_without_errors_or_data_loss():
     # 舊名稱不會消失
     assert session.query(ProductName).count() >= total_products
 
-    # FTS5 觸發器在真實批次匯入規模下仍正確同步（不只是 Task 4 的小規模單元測試）
+    # FTS5 觸發器在真實批次匯入規模下仍正確同步（不只是 Task 4 的小規模單元測試）。
+    # Task 4 的觸發器把每個名稱索引成「整串原文 + 每個重疊 2-gram」多筆記錄，
+    # 不是 1:1，所以這裡驗證「每個名稱至少有對應記錄」而非精確筆數相等。
     fts_count = session.execute(text("SELECT COUNT(*) FROM products_fts")).scalar()
-    assert fts_count == session.query(ProductName).count()
+    product_names_count = session.query(ProductName).count()
+    assert fts_count >= product_names_count
+    distinct_indexed_products = session.execute(
+        text("SELECT COUNT(DISTINCT product_id) FROM products_fts")
+    ).scalar()
+    assert distinct_indexed_products == session.query(Product).count()
 
     # 統計數字內部一致
     for s in snapshots:
