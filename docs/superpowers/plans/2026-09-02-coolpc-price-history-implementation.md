@@ -19,7 +19,7 @@ BeautifulSoup4 + lxml、httpx、FastAPI + Jinja2 + Chart.js（CDN）、pytest。
 ## Global Constraints
 
 - 系統執行期間不得使用 AI/LLM/Agent 做任何商品判斷；所有分類/比對/合併皆為確定性程式規則。
-- HTML 一律用 Big5 解碼；BeautifulSoup 必須使用 `lxml` parser（`html.parser` 對此站台的未閉合標籤會解析失敗）。
+- HTML 一律用 `cp950` codec 解碼（Big5 的 Windows/廠商擴充變體，即一般俗稱的「Big5」；**不可用 Python 內建的 `big5` codec**——經 Task 5 審查實測驗證，`big5` 會把 ETen 廠商擴充字元解成亂碼，例如常見品牌「宏碁」會變成「宏??」，因為「碁」字落在 `big5` codec 未涵蓋的擴充區）。BeautifulSoup 必須使用 `lxml` parser（`html.parser` 對此站台的未閉合標籤會解析失敗）。
 - 商品比對規則：名稱字串完全一致（在未被合併的 `product_names` 中）＝同一商品；任何差異＝新商品，僅寫入 `similarity_hints` 供人工參考，絕不自動合併。
 - 抓取/匯入失敗不得破壞既有資料：DB 寫入包在單一 transaction 內，失敗即 rollback；已下載的原始 HTML 仍永久保存。
 - 兩次抓取不可同時執行（檔案鎖保護）。
@@ -657,10 +657,12 @@ MDY_PATTERN = re.compile(r"(\d{4})/(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2})")
 
 
 def decode_html(raw_bytes: bytes) -> str:
+    # 用 cp950（非內建 big5 codec）：big5 無法涵蓋 ETen 廠商擴充字元，
+    # 會把「碁」等字解成亂碼，導致常見品牌「宏碁」變成「宏??」。
     try:
-        return raw_bytes.decode("big5", errors="replace")
+        return raw_bytes.decode("cp950", errors="replace")
     except LookupError as exc:
-        raise ParseError(f"無法以 Big5 解碼: {exc}") from exc
+        raise ParseError(f"無法以 cp950 解碼: {exc}") from exc
 
 
 def parse_fetched_at(soup: BeautifulSoup) -> datetime.datetime:
@@ -1562,10 +1564,10 @@ from coolpc.scraper.fetcher import fetch_html, save_raw_html, FetchError
 
 def test_fetch_html_returns_body_on_success():
     def handler(request):
-        return httpx.Response(200, content="<html>ok 原價屋</html>".encode("big5"))
+        return httpx.Response(200, content="<html>ok 原價屋</html>".encode("cp950"))
     client = httpx.Client(transport=httpx.MockTransport(handler))
     result = fetch_html(url="https://coolpc.com.tw/evaluate.php", client=client)
-    assert "原價屋" in result.decode("big5")
+    assert "原價屋" in result.decode("cp950")
 
 def test_fetch_html_raises_fetch_error_on_http_status_error():
     def handler(request):
@@ -4574,7 +4576,7 @@ def test_manual_scrape_triggers_run_scrape_and_redirects(monkeypatch):
 def test_html_archive_list_and_view(tmp_path):
     client, Session_ = _make_client()
     html_path = tmp_path / "sample.html"
-    html_path.write_bytes("<html>測試內容 <script>alert(1)</script></html>".encode("big5"))
+    html_path.write_bytes("<html>測試內容 <script>alert(1)</script></html>".encode("cp950"))
     t = datetime.datetime(2026, 2, 1)
     with Session_() as session:
         snap = ScrapeSnapshot(
