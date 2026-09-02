@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}HTML 內容 - 原價屋管理介面{% endblock %}
+{% block content %}
+<h1>{{ snapshot.fetched_at.strftime("%Y-%m-%d %H:%M") }} 原始 HTML</h1>
+<p>路徑：{{ snapshot.raw_html_path }}</p>
+<pre style="white-space:pre-wrap;word-break:break-all;background:#fff;padding:12px;max-height:600px;overflow:auto;">{{ content }}</pre>
+{% endblock %}

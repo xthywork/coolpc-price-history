@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}原價屋管理介面{% endblock %}</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "微軟正黑體", sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
+    header { background: #111827; color: #fff; padding: 12px 20px; display: flex; gap: 20px; }
+    header a { color: #fff; text-decoration: none; font-weight: 600; }
+    main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; word-break: break-all; }
+    th { background: #f1f5f9; }
+    .status-success { color: #15803d; }
+    .status-failed { color: #b91c1c; }
+    .status-partial { color: #d97706; }
+    button { padding: 6px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+<header>
+  <a href="/">抓取狀態</a>
+  <a href="/html-archive">原始 HTML</a>
+  <a href="/products">商品搜尋</a>
+  <a href="/similarity-hints">可能需要合併</a>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
