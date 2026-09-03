@@ -3,6 +3,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
 from coolpc.query_types import OptionalInt, OptionalFloat, OptionalBool
@@ -44,6 +45,13 @@ def search_page(
         sort=sort, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE,
     )
     products, total = search_products(session, filters)
+
+    last_updated_query = session.query(func.max(Product.last_seen_at)).filter(Product.merged_into_id.is_(None))
+    if filters.subcategory_id is not None:
+        last_updated_query = last_updated_query.filter(Product.subcategory_id == filters.subcategory_id)
+    if filters.is_active is not None:
+        last_updated_query = last_updated_query.filter(Product.is_active == filters.is_active)
+    last_updated = last_updated_query.scalar()
 
     rows = []
     for p in products:
@@ -92,6 +100,7 @@ def search_page(
         },
         "query_string": urlencode(query_params),
         "page": page, "total_pages": max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1), "total": total,
+        "last_updated": last_updated,
     })
 
 

@@ -36,13 +36,20 @@
   <button type="submit">搜尋</button>
 </form>
 
-<p>共 {{ total }} 筆結果</p>
+<p>共 {{ total }} 筆結果{% if last_updated %}　最後更新：{{ last_updated.strftime("%Y-%m-%d %H:%M") }}{% endif %}</p>
 
-<table>
+<style>
+  #resultsTable { table-layout: fixed; }
+  #resultsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #resultsTable th .col-resizer {
+    position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
+  }
+</style>
+
+<table id="resultsTable">
   <thead>
     <tr>
-      <th>商品名稱</th><th>分類</th><th>現價</th><th>上次價格</th><th>漲跌</th>
-      <th>30天最低</th><th>30天最高</th><th>狀態</th><th>最後更新</th>
+      <th>商品名稱</th><th>分類</th><th>價格</th><th>狀態</th><th></th>
     </tr>
   </thead>
   <tbody>
@@ -51,14 +58,8 @@
       <td><a href="/products/{{ row.product.id }}">{{ row.product.current_name }}</a></td>
       <td>{{ row.category.name }}</td>
       <td>${{ "{:,}".format(row.product.current_price) }}</td>
-      <td>{% if row.stats.previous_price %}${{ "{:,}".format(row.stats.previous_price) }}{% else %}-{% endif %}</td>
-      <td class="{% if row.stats.change_amount and row.stats.change_amount > 0 %}up{% elif row.stats.change_amount and row.stats.change_amount < 0 %}down{% endif %}">
-        {% if row.stats.change_amount %}{{ "%+d"|format(row.stats.change_amount) }} ({{ "%.1f"|format(row.stats.change_percent) }}%){% else %}-{% endif %}
-      </td>
-      <td>{% if row.stats.low_30d %}${{ "{:,}".format(row.stats.low_30d) }}{% else %}-{% endif %}</td>
-      <td>{% if row.stats.high_30d %}${{ "{:,}".format(row.stats.high_30d) }}{% else %}-{% endif %}</td>
       <td>{{ "在售" if row.product.is_active else "已下架" }}</td>
-      <td>{{ row.product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td><input type="checkbox" class="compareCheckbox" data-id="{{ row.product.id }}"></td>
     </tr>
     {% endfor %}
   </tbody>
@@ -69,4 +70,43 @@
   <span>第 {{ page }} / {{ total_pages }} 頁</span>
   {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}">下一頁</a>{% endif %}
 </div>
+
+<script>
+document.querySelectorAll('.compareCheckbox').forEach(cb => {
+  const id = parseInt(cb.dataset.id, 10);
+  cb.checked = window.coolpcCompare.has(id);
+  cb.addEventListener('change', () => {
+    if (cb.checked) {
+      const ok = window.coolpcCompare.add(id);
+      if (!ok) cb.checked = false;
+    } else {
+      window.coolpcCompare.remove(id);
+    }
+  });
+});
+
+function makeColumnsResizable(table) {
+  table.querySelectorAll('th').forEach(th => {
+    const resizer = document.createElement('div');
+    resizer.className = 'col-resizer';
+    th.appendChild(resizer);
+    resizer.addEventListener('mousedown', (e) => {
+      const startX = e.pageX;
+      const startWidth = th.offsetWidth;
+      const onMouseMove = (e2) => {
+        th.style.width = Math.max(40, startWidth + (e2.pageX - startX)) + 'px';
+      };
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      e.preventDefault();
+    });
+  });
+}
+const resultsTable = document.getElementById('resultsTable');
+if (resultsTable) makeColumnsResizable(resultsTable);
+</script>
 {% endblock %}

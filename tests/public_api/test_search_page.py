@@ -178,3 +178,67 @@ def test_base_layout_compare_js_has_cap_at_5_logic_and_clear_method():
     # clear() 方法：清空清單並更新導覽列
     assert "clear() {" in resp.text
     assert "this._write([]);" in resp.text
+
+
+def test_search_page_results_table_only_has_four_columns_plus_checkbox():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="表格精簡測試",
+                   current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+        product_id = p.id
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "上次價格" not in resp.text
+    assert "漲跌</th>" not in resp.text
+    assert "30天最低" not in resp.text
+    assert "30天最高" not in resp.text
+    assert "<th>最後更新</th>" not in resp.text
+    assert "商品名稱" in resp.text
+    assert "分類" in resp.text
+    assert "狀態" in resp.text
+    assert f'data-id="{product_id}"' in resp.text
+    assert 'class="compareCheckbox"' in resp.text
+
+
+def test_search_page_shows_global_last_updated_after_result_count():
+    client, Session_ = _make_client()
+    t1 = datetime.datetime(2026, 1, 1, 12, 0)
+    t2 = datetime.datetime(2026, 2, 1, 18, 0)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="更新時間A",
+                    current_price=1000, is_active=True, first_seen_at=t1, last_seen_at=t1, created_at=t1)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="更新時間B",
+                    current_price=2000, is_active=True, first_seen_at=t2, last_seen_at=t2, created_at=t2)
+        session.add_all([p1, p2])
+        session.commit()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    count_pos = resp.text.find("共 2 筆結果")
+    updated_pos = resp.text.find("最後更新")
+    assert count_pos != -1
+    assert updated_pos != -1
+    assert updated_pos > count_pos
+    assert "2026-02-01 18:00" in resp.text  # 兩者取較新的 t2
+
+
+def test_search_page_table_is_resizable():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "col-resizer" in resp.text
+    assert "mousedown" in resp.text
