@@ -53,6 +53,12 @@ def undo_merge(session: Session, merge_log_id: int) -> None:
 
     moved_ids = json.loads(merge_log.moved_name_ids)
     if moved_ids:
+        still_owned_by_target = session.query(ProductName.id).filter(
+            ProductName.id.in_(moved_ids),
+            ProductName.product_id == merge_log.target_product_id,
+        ).count()
+        if still_owned_by_target != len(moved_ids):
+            raise MergeError("此合併之後又有其他合併動作影響了這些商品名稱，請先 Undo 較新的合併")
         session.query(ProductName).filter(ProductName.id.in_(moved_ids)).update(
             {"product_id": source.id}, synchronize_session=False
         )

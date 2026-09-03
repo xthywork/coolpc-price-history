@@ -127,3 +127,77 @@ def test_undo_with_multiple_names_only_restores_moved_ones():
 
     assert session.query(ProductName).filter_by(name="ASUS RTX 5070 PRIME OC 12GB V2").one().product_id == target.id
     assert session.query(ProductName).filter_by(name="ASUS RTX 5070 PRIME 12G").one().product_id == source.id
+
+def test_undo_out_of_order_in_merge_chain_is_rejected_then_succeeds_in_order():
+    """A 併入 B，之後 B 又併入 C（都是透過真正的 merge_products 呼叫）。
+    若在 B->C 仍然生效時就想先 Undo A->B，這個 Undo 必須被拒絕，
+    因為 A 的名稱早已經(隨著 B->C 合併)被搬到 C 身上，A->B 當時記錄的
+    moved_name_ids 已經不是「目前掛在 B 上」的狀態了。
+    必須先 Undo 較新的 B->C，再 Undo A->B，兩者才會依序成功。"""
+    session = _session()
+    t = datetime.datetime(2026, 2, 1)
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+
+    a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="A商品",
+                current_price=1000, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+    b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="B商品",
+                current_price=2000, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+    c = Product(category_id=cat.id, subcategory_id=sub.id, current_name="C商品",
+                current_price=3000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+    session.add_all([a, b, c])
+    session.flush()
+    session.add_all([
+        ProductName(product_id=a.id, name="A的名稱", first_seen_at=t, last_seen_at=t),
+        ProductName(product_id=b.id, name="B的名稱", first_seen_at=t, last_seen_at=t),
+        ProductName(product_id=c.id, name="C的名稱", first_seen_at=t, last_seen_at=t),
+    ])
+    session.add_all([
+        PriceHistory(product_id=a.id, price=1000, status=None, badges="", scraped_at=t, snapshot_id=1),
+        PriceHistory(product_id=b.id, price=2000, status=None, badges="", scraped_at=t, snapshot_id=1),
+        PriceHistory(product_id=c.id, price=3000, status=None, badges="", scraped_at=t, snapshot_id=1),
+    ])
+    session.commit()
+
+    merge_ab = merge_products(session, a.id, b.id)
+    session.commit()
+    merge_bc = merge_products(session, b.id, c.id)
+    session.commit()
+
+    # 此時 A 的名稱、B 的名稱都已經掛在 C 身上
+    assert {n.product_id for n in session.query(ProductName).all()} == {c.id}
+
+    # 先 Undo 較舊的 A->B：必須被拒絕，因為 A 的名稱已經不在 B 身上了（在 C 身上）
+    with pytest.raises(MergeError):
+        undo_merge(session, merge_ab.id)
+    session.rollback()
+
+    # 改成先 Undo 較新的 B->C：應該成功，因為 B->C 記錄搬動的名稱目前確實都還在 C 身上
+    undo_merge(session, merge_bc.id)
+    session.commit()
+
+    session.refresh(b)
+    assert b.merged_into_id is None
+    # B 自己的名稱、以及 A 的名稱（A->B 尚未 Undo，所以仍掛在 B 上）都應回到 B
+    names_by_product = {n.name: n.product_id for n in session.query(ProductName).all()}
+    assert names_by_product["B的名稱"] == b.id
+    assert names_by_product["A的名稱"] == b.id
+    assert names_by_product["C的名稱"] == c.id
+
+    # 最後 Undo 較舊的 A->B：現在 B 是目前正確、未被搬動過的擁有者，應該成功
+    undo_merge(session, merge_ab.id)
+    session.commit()
+
+    session.refresh(a)
+    assert a.merged_into_id is None
+    names_by_product = {n.name: n.product_id for n in session.query(ProductName).all()}
+    assert names_by_product["A的名稱"] == a.id
+    assert names_by_product["B的名稱"] == b.id
+    assert names_by_product["C的名稱"] == c.id
+
+    # 全程沒有任何價格歷史遺失
+    assert session.query(PriceHistory).filter_by(product_id=a.id).count() == 1
+    assert session.query(PriceHistory).filter_by(product_id=b.id).count() == 1
+    assert session.query(PriceHistory).filter_by(product_id=c.id).count() == 1
