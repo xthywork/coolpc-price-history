@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from coolpc.admin_api.dependencies import get_session
 from coolpc.query_types import OptionalInt, OptionalBool
 from coolpc.db.models import Category, MergeLog, Product
-from coolpc.search.service import SearchFilters, search_products
+from coolpc.search.service import SearchFilters, search_products, search_products_and
 from coolpc.merging.service import merge_products, undo_merge, MergeError
 
 router = APIRouter()
@@ -33,8 +33,13 @@ def product_search(
 def product_search_json(q: str = "", session: Session = Depends(get_session)):
     if not q.strip():
         return []
-    filters = SearchFilters(q=q, limit=10)
-    products, _total = search_products(session, filters)
+    # 先試 AND 語意（要求所有 token 都命中），在真實資料量下才能精確命中查詢的
+    # 那個商品本身；只有在 AND 完全查無結果（查詢字串太模糊/太籠統）時，才退回
+    # search_products() 的 OR 語意當作較寬鬆的後備，避免完全查不到東西。
+    products = search_products_and(session, q, limit=10)
+    if not products:
+        filters = SearchFilters(q=q, limit=10)
+        products, _total = search_products(session, filters)
     return [
         {"id": p.id, "name": p.current_name, "price": p.current_price, "is_active": p.is_active}
         for p in products
@@ -44,7 +49,10 @@ def product_search_json(q: str = "", session: Session = Depends(get_session)):
 @router.get("/merge")
 def merge_form(request: Request, message: str | None = None, error: str | None = None,
                session: Session = Depends(get_session)):
-    logs = session.query(MergeLog).order_by(MergeLog.merged_at.desc()).limit(50).all()
+    # 批量合併一次最多可產生 100 組 MergeLog（similarity-hints 頁一次最多勾選
+    # 100 組候選配對），這裡的上限要能容納這個實際上限，否則超出的紀錄永遠
+    # 無法從這個未分頁列表被找到、被 Undo。
+    logs = session.query(MergeLog).order_by(MergeLog.merged_at.desc()).limit(200).all()
     log_rows = [
         {"log": log, "source": session.get(Product, log.source_product_id),
          "target": session.get(Product, log.target_product_id)}

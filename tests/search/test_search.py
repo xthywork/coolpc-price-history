@@ -2,7 +2,7 @@ import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from coolpc.db.models import Base, Category, Subcategory, Product, ProductName
-from coolpc.search.service import SearchFilters, search_products
+from coolpc.search.service import SearchFilters, search_products, search_products_and
 
 def _session():
     engine = create_engine("sqlite:///:memory:")
@@ -193,3 +193,38 @@ def test_search_by_keyword_with_space_also_means_or():
     assert "ASUS RTX 5070 PRIME 12G" in names
     assert "MSI RTX 5080 GAMING 16G" in names
     assert "Synology DS923+" not in names
+
+
+def test_search_products_and_requires_all_tokens_across_names():
+    """AND 語意：所有 token（含整段字串）都要在該商品的某個歷史名稱比對到，
+    tokens 不必落在同一個 ProductName 列上（可跨目前名稱與歷史名稱）。"""
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    target = _add(session, cat, sub, "ASUS RTX 5070 PRIME OC 12GB", 19990, True, t)
+    # 整段字串比對落在另一個歷史名稱列上，證明不必和 token 比對同一列。
+    session.add(ProductName(product_id=target.id, name="ASUS RTX 5070 PRIME 12G", first_seen_at=t, last_seen_at=t))
+    _add(session, cat, sub, "MSI RTX 5080 GAMING 16G", 28990, True, t)
+    session.commit()
+
+    results = search_products_and(session, "ASUS RTX 5070 PRIME 12G")
+    assert len(results) == 1
+    assert results[0].id == target.id
+
+
+def test_search_products_and_returns_empty_when_only_some_tokens_match():
+    """只有部分 token 命中時（AND 語意）不應回傳該商品。"""
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "MSI RTX 5080 GAMING 16G", 28990, True, t)
+    session.commit()
+
+    results = search_products_and(session, "ASUS RTX 5070 PRIME 12G")
+    assert results == []

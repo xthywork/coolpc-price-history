@@ -25,6 +25,7 @@
 <header>
   <a href="/">商品搜尋</a>
   <a href="/compare" id="compareNavLink">商品比較</a>
+  <a href="#" id="compareClearLink" onclick="window.coolpcCompare.clear(); return false;">清空比較清單</a>
 </header>
 <script>
 window.coolpcCompare = {
@@ -40,13 +41,27 @@ window.coolpcCompare = {
   },
   has(id) { return this._read().includes(id); },
   add(id) {
+    // 比較清單最多 5 個商品（/compare 頁本身要求 2 到 5 個），沒有這個上限的話
+    // localStorage 裡的清單可能無止盡累積，導致 /compare 永遠 hard-error。
     const ids = this._read();
-    if (!ids.includes(id)) { ids.push(id); this._write(ids); }
+    if (!ids.includes(id)) {
+      if (ids.length >= 5) {
+        alert('比較清單最多 5 個商品，請先移除一些再加入新的。');
+        return false;
+      }
+      ids.push(id);
+      this._write(ids);
+    }
     this._updateNav();
+    return true;
   },
   remove(id) {
     const ids = this._read().filter(x => x !== id);
     this._write(ids);
+    this._updateNav();
+  },
+  clear() {
+    this._write([]);
     this._updateNav();
   },
   _updateNav() {

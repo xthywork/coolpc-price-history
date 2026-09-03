@@ -189,6 +189,87 @@ def test_product_search_json_empty_query_returns_empty_list():
     assert resp.json() == []
 
 
+def test_product_search_json_and_match_finds_exact_product_among_many_newer():
+    """搜尋一個商品的完整名稱時，即使有超過 10 個 last_seen_at 較新的其他商品，
+    AND 比對也應該精確命中該商品本身（而不是被純 OR + LIMIT 10 擠出結果）。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        target = Product(category_id=cat.id, subcategory_id=sub.id,
+                          current_name="ASUS RTX 5070 PRIME OC 12GB 特仕版",
+                          current_price=19990, is_active=True,
+                          first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(target)
+        session.flush()
+        session.add(ProductName(product_id=target.id, name=target.current_name,
+                                 first_seen_at=t, last_seen_at=t))
+        newer = t + datetime.timedelta(days=1)
+        for i in range(12):
+            other = Product(category_id=cat.id, subcategory_id=sub.id,
+                             current_name=f"其他商品 RTX {i}",
+                             current_price=1000 + i, is_active=True,
+                             first_seen_at=newer, last_seen_at=newer, created_at=newer)
+            session.add(other)
+            session.flush()
+            session.add(ProductName(product_id=other.id, name=other.current_name,
+                                     first_seen_at=newer, last_seen_at=newer))
+        session.commit()
+        target_id = target.id
+
+    resp = client.get("/products/search-json", params={"q": "ASUS RTX 5070 PRIME OC 12GB 特仕版"})
+    assert resp.status_code == 200
+    ids = [row["id"] for row in resp.json()]
+    assert target_id in ids
+
+
+def test_product_search_json_falls_back_to_or_when_and_match_is_empty():
+    """AND 比對查無結果時（例如查詢分段各自符合不同商品），應退回 OR 語意，
+    仍能靠單一 token 找到候選商品，而不是直接回傳空陣列。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
+                    current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="MSI RTX 5080 GAMING 16G",
+                    current_price=28990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([a, b])
+        session.flush()
+        session.add_all([
+            ProductName(product_id=a.id, name=a.current_name, first_seen_at=t, last_seen_at=t),
+            ProductName(product_id=b.id, name=b.current_name, first_seen_at=t, last_seen_at=t),
+        ])
+        session.commit()
+
+    resp = client.get("/products/search-json", params={"q": "RTX 5090"})
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+def test_merge_page_shows_more_than_50_merge_logs():
+    """批量合併一次最多可產生 100 組 MergeLog，/merge 頁面的上限必須容得下，
+    否則超過 50 筆之後的紀錄就永遠無法從管理介面被 Undo。"""
+    client, Session_ = _make_client()
+    source_id, target_id = _seed_two_products(Session_)
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        for i in range(60):
+            session.add(MergeLog(source_product_id=source_id, target_product_id=target_id,
+                                  merged_at=t + datetime.timedelta(minutes=i)))
+        session.commit()
+
+    resp = client.get("/merge")
+    assert resp.status_code == 200
+    assert resp.text.count("已合併") >= 60
+
+
 def test_merge_page_has_search_inputs_and_fallback_id_inputs():
     client, _Session_ = _make_client()
     resp = client.get("/merge")

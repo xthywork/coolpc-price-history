@@ -93,7 +93,8 @@ const compareCheckbox = document.getElementById('compareCheckbox');
 compareCheckbox.checked = window.coolpcCompare.has(productId);
 compareCheckbox.addEventListener('change', () => {
   if (compareCheckbox.checked) {
-    window.coolpcCompare.add(productId);
+    const added = window.coolpcCompare.add(productId);
+    if (!added) { compareCheckbox.checked = false; }
   } else {
     window.coolpcCompare.remove(productId);
   }

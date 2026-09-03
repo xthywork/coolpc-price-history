@@ -169,6 +169,49 @@ def test_batch_dismiss_hints_dismisses_selected_without_merging():
     assert "商品A獨特字串批量忽略" not in after.text
 
 
+def test_similarity_hints_excludes_merged_away_products_beyond_naive_limit():
+    """在 LIMIT 100 之前先在 SQL 排除已合併商品的候選配對——若還是先 LIMIT 100
+    再用 Python 過濾，分數最高但已失效的那組會佔掉 LIMIT 視窗裡的一個名額，
+    導致排在它後面、分數較低但仍然有效的候選被擠出畫面（總數少於 100）。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+
+        # 分數最高、但其中一個商品已被合併走的失效候選。
+        merged_a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="已合併商品A",
+                            current_price=100, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+        merged_b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="已合併商品B",
+                            current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([merged_a, merged_b])
+        session.flush()
+        merged_a.merged_into_id = merged_b.id
+        session.add(SimilarityHint(product_a_id=merged_a.id, product_b_id=merged_b.id,
+                                    score=0.99, computed_at=t, dismissed=False))
+
+        # 101 組分數較低、但仍然有效的候選配對。
+        for i in range(101):
+            pa = Product(category_id=cat.id, subcategory_id=sub.id, current_name=f"有效商品A{i}",
+                         current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+            pb = Product(category_id=cat.id, subcategory_id=sub.id, current_name=f"有效商品B{i}",
+                         current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+            session.add_all([pa, pb])
+            session.flush()
+            session.add(SimilarityHint(product_a_id=pa.id, product_b_id=pb.id,
+                                        score=0.5 + i * 0.001, computed_at=t, dismissed=False))
+        session.commit()
+
+    resp = client.get("/similarity-hints")
+    assert resp.status_code == 200
+    assert "已合併商品A" not in resp.text
+    assert "已合併商品B" not in resp.text
+    # 應該顯示滿滿 100 組真正待處理的候選，不會因為失效項目佔用 LIMIT 名額而變少。
+    assert resp.text.count('name="hint_ids"') == 100
+
+
 def test_similarity_hints_page_has_checkbox_and_no_per_row_action_column():
     client, Session_ = _make_client()
     t = datetime.datetime(2026, 2, 1)

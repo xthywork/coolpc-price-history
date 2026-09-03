@@ -77,3 +77,26 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
     query = query.order_by(_SORT_MAP.get(filters.sort, Product.last_seen_at.desc()))
     query = query.offset(filters.offset).limit(filters.limit)
     return query.all(), total
+
+
+def search_products_and(session: Session, q: str, limit: int = 10) -> list[Product]:
+    """AND 語意搜尋：每個空白分隔的 token（以及整段字串本身）都必須各自在該商品的
+    某個歷史名稱（ProductName）上比對到才算符合——不必是同一列，同一商品底下的
+    不同名稱列都算數。用於管理後台合併頁的名稱自動完成：比對範圍精確，
+    不像 search_products() 的 OR 語意會在大量真實資料下讓真正符合的商品被
+    LIMIT 擠出結果（那個 OR 語意本身是刻意保留、給公開搜尋頁用的，這裡不動它）。
+    """
+    if not q or not q.strip():
+        return []
+    tokens = q.split()
+    patterns = {q, *tokens}
+    query = session.query(Product).filter(Product.merged_into_id.is_(None))
+    for pattern in patterns:
+        matched_ids = (
+            session.query(ProductName.product_id)
+            .filter(ProductName.name.like(f"%{pattern}%"))
+            .distinct()
+        )
+        query = query.filter(Product.id.in_(matched_ids))
+    query = query.order_by(Product.last_seen_at.desc()).limit(limit)
+    return query.all()

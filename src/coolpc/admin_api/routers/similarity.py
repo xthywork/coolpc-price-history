@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from coolpc.admin_api.dependencies import get_session
 from coolpc.db.models import Product, SimilarityHint
 from coolpc.matching.similarity import refresh_similarity_hints
@@ -17,17 +17,26 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
 @router.get("/similarity-hints")
 def similarity_hints_page(request: Request, message: str | None = None,
                            session: Session = Depends(get_session)):
+    # 已合併走的商品要在 SQL 層、LIMIT 之前就排除，否則分數高但已失效的候選
+    # 會佔掉 LIMIT 100 視窗裡的名額，把排在後面、分數較低但仍然有效的候選
+    # 擠出畫面之外（而且這些被擠掉的 hint 從未被標記 dismissed，永遠卡住）。
+    ProductA = aliased(Product)
+    ProductB = aliased(Product)
     hints = (
-        session.query(SimilarityHint)
+        session.query(SimilarityHint, ProductA, ProductB)
+        .join(ProductA, SimilarityHint.product_a_id == ProductA.id)
+        .join(ProductB, SimilarityHint.product_b_id == ProductB.id)
         .filter(SimilarityHint.dismissed.is_(False))
+        .filter(ProductA.merged_into_id.is_(None))
+        .filter(ProductB.merged_into_id.is_(None))
         .order_by(SimilarityHint.score.desc())
         .limit(100)
         .all()
     )
     rows = []
-    for h in hints:
-        pa = session.get(Product, h.product_a_id)
-        pb = session.get(Product, h.product_b_id)
+    for h, pa, pb in hints:
+        # 商品理論上不會被實際刪除（本專案只標記 inactive，不刪列），這裡僅作
+        # 防禦性保留；merged_into_id 的過濾已經在上面的 SQL JOIN 完成。
         if pa is None or pb is None or pa.merged_into_id is not None or pb.merged_into_id is not None:
             continue
         rows.append({"hint": h, "a": pa, "b": pb})
