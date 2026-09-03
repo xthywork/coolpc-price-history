@@ -9,6 +9,21 @@ class MergeError(Exception):
     pass
 
 
+def choose_merge_direction(a: Product, b: Product) -> tuple[Product, Product]:
+    """回傳 (source, target)。這是決定性規則，不做任何名稱/相似度判斷：
+    兩商品只有一個仍在上架中，該商品當 target；否則（都上架或都下架）
+    以 last_seen_at 較新者當 target；完全同分以 id 較小者當 target。"""
+    if a.is_active and not b.is_active:
+        target, source = a, b
+    elif b.is_active and not a.is_active:
+        target, source = b, a
+    elif a.last_seen_at != b.last_seen_at:
+        target, source = (a, b) if a.last_seen_at > b.last_seen_at else (b, a)
+    else:
+        target, source = (a, b) if a.id < b.id else (b, a)
+    return source, target
+
+
 def merge_products(session: Session, source_id: int, target_id: int,
                     now: datetime.datetime | None = None) -> MergeLog:
     now = now or datetime.datetime.utcnow()
