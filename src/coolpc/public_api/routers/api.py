@@ -3,6 +3,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
+from coolpc.query_types import OptionalInt, OptionalFloat, OptionalBool, OptionalDatetime
 from coolpc.public_api import schemas
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
@@ -34,16 +35,16 @@ def _to_list_item(session: Session, product: Product) -> schemas.ProductListItem
 @router.get("/products", response_model=schemas.ProductListPage)
 def list_products(
     q: str | None = None,
-    category_id: int | None = None,
-    subcategory_id: int | None = None,
+    category_id: OptionalInt = None,
+    subcategory_id: OptionalInt = None,
     brand: str | None = None,
     model: str | None = None,
-    min_price: int | None = None,
-    max_price: int | None = None,
-    is_active: bool | None = None,
+    min_price: OptionalInt = None,
+    max_price: OptionalInt = None,
+    is_active: OptionalBool = None,
     recent_change: str | None = None,
-    min_change_percent: float | None = None,
-    max_change_percent: float | None = None,
+    min_change_percent: OptionalFloat = None,
+    max_change_percent: OptionalFloat = None,
     sort: str = "last_seen_desc",
     limit: int = Query(default=50, le=200),
     offset: int = 0,
@@ -84,9 +85,9 @@ def get_product(product: Product = Depends(get_visible_product), session: Sessio
 @router.get("/products/{product_id}/prices", response_model=list[schemas.PricePoint])
 def get_product_prices(
     product: Product = Depends(get_visible_product),
-    start: dt.datetime | None = None,
-    end: dt.datetime | None = None,
-    days: int | None = None,
+    start: OptionalDatetime = None,
+    end: OptionalDatetime = None,
+    days: OptionalInt = None,
     session: Session = Depends(get_session),
 ):
     effective_start = start

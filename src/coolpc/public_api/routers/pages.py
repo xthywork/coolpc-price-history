@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
+from coolpc.query_types import OptionalInt, OptionalFloat, OptionalBool
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
 from coolpc.stats.service import compute_product_stats, get_price_history
@@ -19,16 +20,16 @@ PAGE_SIZE = 30
 def search_page(
     request: Request,
     q: str | None = None,
-    category_id: int | None = None,
-    subcategory_id: int | None = None,
+    category_id: OptionalInt = None,
+    subcategory_id: OptionalInt = None,
     brand: str | None = None,
     model: str | None = None,
-    min_price: int | None = None,
-    max_price: int | None = None,
-    is_active: bool | None = None,
+    min_price: OptionalInt = None,
+    max_price: OptionalInt = None,
+    is_active: OptionalBool = None,
     recent_change: str | None = None,
-    min_change_percent: float | None = None,
-    max_change_percent: float | None = None,
+    min_change_percent: OptionalFloat = None,
+    max_change_percent: OptionalFloat = None,
     sort: str = "last_seen_desc",
     page: int = 1,
     session: Session = Depends(get_session),

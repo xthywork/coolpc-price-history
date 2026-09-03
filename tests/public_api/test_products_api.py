@@ -124,3 +124,17 @@ def test_list_products_filters_by_change_percent_range():
     data = resp.json()
     assert data["total"] == 1
     assert data["items"][0]["current_name"] == "漲很多"
+
+
+def test_list_products_accepts_blank_optional_query_params_without_422():
+    # 前端表單或客戶端組裝查詢字串時常會送出空字串（而非完全省略參數），
+    # 例如 category_id=&min_price=&is_active=；這些欄位是 int/bool/float，
+    # 必須把空字串視為「未指定」而不是回 422。
+    client, _Session_ = _make_client()
+    resp = client.get("/api/products", params={
+        "q": "", "category_id": "", "subcategory_id": "", "brand": "", "model": "",
+        "min_price": "", "max_price": "", "is_active": "", "recent_change": "",
+        "min_change_percent": "", "max_change_percent": "",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0

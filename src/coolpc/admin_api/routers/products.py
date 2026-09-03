@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from coolpc.admin_api.dependencies import get_session
+from coolpc.query_types import OptionalInt, OptionalBool
 from coolpc.db.models import Category, MergeLog, Product
 from coolpc.search.service import SearchFilters, search_products
 from coolpc.merging.service import merge_products, undo_merge, MergeError
@@ -16,8 +17,8 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
 
 @router.get("/products")
 def product_search(
-    request: Request, q: str | None = None, category_id: int | None = None,
-    is_active: bool | None = None, session: Session = Depends(get_session),
+    request: Request, q: str | None = None, category_id: OptionalInt = None,
+    is_active: OptionalBool = None, session: Session = Depends(get_session),
 ):
     filters = SearchFilters(q=q, category_id=category_id, is_active=is_active, limit=100)
     products, total = search_products(session, filters)

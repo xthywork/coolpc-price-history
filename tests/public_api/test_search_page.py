@@ -111,3 +111,16 @@ def test_search_page_subcategory_select_and_filter():
     assert "顯卡商品A" in resp.text
     assert "主機板商品B" not in resp.text
     assert f'value="{sub1_id}" selected' in resp.text
+
+
+def test_search_page_accepts_blank_form_fields_without_422():
+    # 瀏覽器送出未填的下拉選單/數字欄位時，值是空字串而非省略整個參數
+    # （例如 category_id=&min_price=&is_active=&min_change_percent=），
+    # 這些欄位型別是 int/bool/float，必須把空字串視為「未指定」而不是 422。
+    client, _Session_ = _make_client()
+    resp = client.get("/", params={
+        "q": "", "category_id": "", "subcategory_id": "", "brand": "", "model": "",
+        "min_price": "", "max_price": "", "is_active": "", "recent_change": "",
+        "min_change_percent": "", "max_change_percent": "", "sort": "last_seen_desc",
+    })
+    assert resp.status_code == 200
