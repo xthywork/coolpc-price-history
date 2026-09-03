@@ -98,6 +98,30 @@ def ingest_snapshot(
     scrape_type: str,
     raw_html_path: str | None,
 ) -> ScrapeSnapshot:
+    # C3: fetched_at 來自 HTML 內嵌的時間戳，不是牆上時鐘時間。重複匯入同一份
+    # 歷史檔案（或 import-dir 匯入到與先前重疊的日期範圍，README 記載的常見
+    # 補匯流程）會用同一個 fetched_at 再次呼叫本函式；若不做防重，會為每個
+    # 商品重複建立 PriceHistory，悄悄地把所有價格圖表、previous_price/
+    # change_amount 統計都弄成兩倍。這裡做成 idempotent no-op：已有成功匯入
+    # 紀錄就直接回傳既有的 ScrapeSnapshot，不重新處理。
+    existing = (
+        session.query(ScrapeSnapshot)
+        .filter_by(fetched_at=parsed.fetched_at, status="success")
+        .one_or_none()
+    )
+    if existing is not None:
+        return existing
+
+    # I6: 在建立本次快照之前，先找出「上一筆成功或部分成功」的快照，用它的
+    # total_products 當作基準，判斷本次快照是否疑似「只解析到一部分」
+    # （例如原站 HTML 結構局部改版，某些 <select> 區塊解析失敗）。
+    prior_successful = (
+        session.query(ScrapeSnapshot)
+        .filter(ScrapeSnapshot.status.in_(["success", "partial"]))
+        .order_by(ScrapeSnapshot.fetched_at.desc())
+        .first()
+    )
+
     snapshot = ScrapeSnapshot(
         fetched_at=parsed.fetched_at, scrape_type=scrape_type,
         raw_html_path=raw_html_path, status="success", error_message=None,
@@ -124,17 +148,28 @@ def ingest_snapshot(
         elif price_delta < 0:
             down += 1
 
-    delisted = 0
-    active_products = (
-        session.query(Product)
-        .filter(Product.is_active.is_(True), Product.merged_into_id.is_(None))
-        .all()
+    # I6: 本次快照商品數若遠低於前一次成功快照（低於 70%），視為解析可能不完整，
+    # 標記為 partial 並且完全跳過下架比對——寧可暫時保留現有的 is_active 狀態不變，
+    # 也不要因為一次可能有問題的解析而誤將大量商品下架。
+    is_partial = (
+        prior_successful is not None
+        and prior_successful.total_products > 0
+        and total < prior_successful.total_products * 0.7
     )
-    for product in active_products:
-        if product.id not in seen_product_ids:
-            product.is_active = False
-            delisted += 1
 
+    delisted = 0
+    if not is_partial:
+        active_products = (
+            session.query(Product)
+            .filter(Product.is_active.is_(True), Product.merged_into_id.is_(None))
+            .all()
+        )
+        for product in active_products:
+            if product.id not in seen_product_ids:
+                product.is_active = False
+                delisted += 1
+
+    snapshot.status = "partial" if is_partial else "success"
     snapshot.total_products = total
     snapshot.new_products = new
     snapshot.delisted_products = delisted
