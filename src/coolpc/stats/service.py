@@ -23,11 +23,23 @@ class ProductStats:
 
 
 def get_merged_group_product_ids(session: Session, product_id: int) -> list[int]:
-    source_ids = [
-        row[0] for row in
-        session.query(Product.id).filter(Product.merged_into_id == product_id).all()
-    ]
-    return [product_id, *source_ids]
+    """回傳與 product_id 屬於同一個合併群組的所有商品 id（含自己）。
+
+    以廣度優先方式遞迴展開：不只找出「直接合併進 product_id 的商品」，
+    還要繼續找出「合併進那些商品的商品」，直到不再有新的成員加入為止。
+    這是為了正確處理合併鏈（A 併入 B，之後 B 又併入 C）——如果只找一層，
+    從 C 查詢群組會漏掉 A，導致 A 的價格歷史從所有統計/歷史端點消失。
+    """
+    group = {product_id}
+    frontier = {product_id}
+    while frontier:
+        rows = session.query(Product.id).filter(Product.merged_into_id.in_(frontier)).all()
+        new_ids = {r[0] for r in rows} - group
+        if not new_ids:
+            break
+        group |= new_ids
+        frontier = new_ids
+    return sorted(group)
 
 
 def get_price_history(
