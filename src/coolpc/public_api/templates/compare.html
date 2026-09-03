@@ -2,6 +2,7 @@
 {% block title %}商品比較 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
 <h1>商品比較</h1>
+<p><a href="#" onclick="window.coolpcCompare.clear(); window.location.href='/compare'; return false;">清空比較清單</a></p>
 <form method="get" action="/compare">
   <input type="text" name="ids" placeholder="輸入商品 ID，以逗號分隔，如 1,2,3" value="{{ ids }}">
   <button type="submit">比較</button>
@@ -13,37 +14,48 @@
 <table>
   <thead>
     <tr>
-      <th>商品</th><th>現價</th><th>7天最低</th><th>30天最低</th><th>30天最高</th>
-      <th>歷史最低</th><th>歷史最高</th><th>最近漲跌</th>
+      <th>商品</th><th>現價</th><th>歷史最低</th><th>歷史最高</th>
     </tr>
   </thead>
   <tbody>
     {% for item in items %}
     <tr>
-      <td><a href="/products/{{ item.product.id }}">{{ item.product.current_name }}</a></td>
+      <td>
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:{{ colors[loop.index0 % colors|length] }};"></span>
+        <a href="/products/{{ item.product.id }}">{{ item.product.current_name }}</a>
+      </td>
       <td>${{ "{:,}".format(item.product.current_price) }}</td>
-      <td>{{ item.stats.low_7d or "-" }}</td>
-      <td>{{ item.stats.low_30d or "-" }}</td>
-      <td>{{ item.stats.high_30d or "-" }}</td>
       <td>${{ "{:,}".format(item.stats.all_time_low) }}</td>
       <td>${{ "{:,}".format(item.stats.all_time_high) }}</td>
-      <td>{% if item.stats.change_amount %}{{ "%+d"|format(item.stats.change_amount) }} ({{ "%.1f"|format(item.stats.change_percent) }}%){% else %}-{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 
+<h2>價格走勢</h2>
+<div>
+  <button data-range="7">7天</button>
+  <button data-range="30">30天</button>
+  <button data-range="90">90天</button>
+  <button data-range="all">全部</button>
+  自訂：<input type="date" id="rangeStart"> ~ <input type="date" id="rangeEnd">
+</div>
 <canvas id="compareChart" height="100"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 const productIds = [{% for item in items %}{{ item.product.id }}{% if not loop.last %},{% endif %}{% endfor %}];
-const colors = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed'];
+const colors = {{ colors|tojson }};
+let compareChart;
 
-async function loadCompareChart() {
+async function loadCompareChart(params) {
   const seriesList = [];
   for (const pid of productIds) {
-    const resp = await fetch(`/api/products/${pid}/prices`);
+    const url = new URL(`/api/products/${pid}/prices`, window.location.origin);
+    for (const [k, v] of Object.entries(params || {})) {
+      if (v) url.searchParams.set(k, v);
+    }
+    const resp = await fetch(url);
     seriesList.push(await resp.json());
   }
   const labelSet = new Set();
@@ -61,19 +73,46 @@ async function loadCompareChart() {
     };
   });
 
-  const ctx = document.getElementById('compareChart').getContext('2d');
-  new Chart(ctx, {
-    type: 'line',
-    data: { labels: labels, datasets: datasets },
-    options: {
-      scales: {
-        x: { title: { display: true, text: '日期 / 時間' } },
-        y: { title: { display: true, text: '價格 TWD' } },
+  if (compareChart) {
+    compareChart.data.labels = labels;
+    compareChart.data.datasets = datasets;
+    compareChart.update();
+  } else {
+    const ctx = document.getElementById('compareChart').getContext('2d');
+    compareChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: '日期 / 時間' } },
+          y: { title: { display: true, text: '價格 TWD' } },
+        },
       },
-    },
+    });
+  }
+}
+
+document.querySelectorAll('button[data-range]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const range = btn.dataset.range;
+    loadCompareChart(range === 'all' ? {} : { days: range });
+  });
+});
+
+function loadCustomRange() {
+  const startVal = document.getElementById('rangeStart').value;
+  const endVal = document.getElementById('rangeEnd').value;
+  if (!startVal && !endVal) return;
+  loadCompareChart({
+    start: startVal ? `${startVal}T00:00:00` : '',
+    end: endVal ? `${endVal}T23:59:59` : '',
   });
 }
-loadCompareChart();
+document.getElementById('rangeStart').addEventListener('change', loadCustomRange);
+document.getElementById('rangeEnd').addEventListener('change', loadCustomRange);
+
+loadCompareChart({});
 </script>
 {% endif %}
 {% endblock %}

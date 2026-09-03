@@ -159,11 +159,13 @@ def test_search_page_removed_fields_are_gone():
 
 
 def test_base_layout_has_compare_clear_control():
+    # 「清空比較清單」連結已搬到 /compare 頁面本身（見 test_compare_page.py），
+    # base.html（所有頁面共用）不應該再有這個控制項；coolpcCompare.clear() 方法本身仍保留。
     client, _Session_ = _make_client()
     resp = client.get("/")
     assert resp.status_code == 200
-    assert 'id="compareClearLink"' in resp.text
-    assert "coolpcCompare.clear()" in resp.text
+    assert 'id="compareClearLink"' not in resp.text
+    assert "clear()" in resp.text
 
 
 def test_base_layout_compare_js_has_cap_at_5_logic_and_clear_method():

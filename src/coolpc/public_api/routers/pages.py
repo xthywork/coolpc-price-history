@@ -14,6 +14,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 PAGE_SIZE = 30
+COMPARE_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"]
 
 
 @router.get("/")
@@ -137,5 +138,5 @@ def compare_page(request: Request, ids: str | None = None, session: Session = De
                 items.append({"product": product, "stats": compute_product_stats(session, pid)})
 
     return templates.TemplateResponse(request, "compare.html", {
-        "items": items, "ids": ids or "", "error": error,
+        "items": items, "ids": ids or "", "error": error, "colors": COMPARE_COLORS,
     })

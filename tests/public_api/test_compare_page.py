@@ -98,3 +98,109 @@ def test_compare_page_rejects_merged_away_product_id():
     resp = client.get("/compare", params={"ids": f"{source_id},{other_id}"})
     assert resp.status_code == 200
     assert f"商品不存在: {source_id}" in resp.text
+
+
+def test_compare_page_table_only_has_four_columns():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較精簡A",
+                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較精簡B",
+                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.commit()
+        p1_id, p2_id = p1.id, p2.id
+
+    resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
+    assert resp.status_code == 200
+    assert "7天最低" not in resp.text
+    assert "30天最低" not in resp.text
+    assert "30天最高" not in resp.text
+    assert "最近漲跌" not in resp.text
+    assert "歷史最低" in resp.text
+    assert "歷史最高" in resp.text
+    assert "現價" in resp.text
+
+
+def test_compare_page_has_color_dot_before_product_name_and_no_default_legend():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較顏色A",
+                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較顏色B",
+                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.commit()
+        p1_id, p2_id = p1.id, p2.id
+
+    resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
+    assert resp.status_code == 200
+    assert "legend" in resp.text and "display: false" in resp.text.replace('"', '').replace("'", "")
+    assert "colors[loop.index0" not in resp.text  # 不應該有殘留的 Jinja 語法字面文字
+    assert resp.text.count("background:") >= 2 or resp.text.count("background-color:") >= 2
+
+
+def test_compare_page_chart_has_range_controls_and_no_apply_button():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較區間A",
+                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較區間B",
+                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.commit()
+        p1_id, p2_id = p1.id, p2.id
+
+    resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
+    assert resp.status_code == 200
+    assert 'data-range="7"' in resp.text
+    assert 'data-range="30"' in resp.text
+    assert 'data-range="90"' in resp.text
+    assert 'data-range="all"' in resp.text
+    assert 'id="rangeStart"' in resp.text
+    assert 'id="rangeEnd"' in resp.text
+    assert ">套用<" not in resp.text
+    assert "'change'" in resp.text
+
+
+def test_compare_page_has_clear_link_and_base_html_no_longer_does():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較清空A",
+                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較清空B",
+                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.commit()
+        p1_id, p2_id = p1.id, p2.id
+
+    resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
+    assert resp.status_code == 200
+    assert "coolpcCompare.clear()" in resp.text
+    assert "清空比較清單" in resp.text
+
+    home = client.get("/")
+    assert 'id="compareClearLink"' not in home.text
+    # _updateNav 的邏輯（維持已選清單的關鍵）必須還在 base.html 裡，只是清空按鈕搬走
+    assert "_updateNav" in home.text
+    assert "coolpcCompare" in home.text
