@@ -204,3 +204,11 @@ def test_compare_page_has_clear_link_and_base_html_no_longer_does():
     # _updateNav 的邏輯（維持已選清單的關鍵）必須還在 base.html 裡，只是清空按鈕搬走
     assert "_updateNav" in home.text
     assert "coolpcCompare" in home.text
+
+    # 死路防護：清單裡有商品失效（例如已合併/下架/不存在）時，/compare 會走
+    # error 路徑而不是 items 路徑，清空連結仍必須渲染，否則使用者在清單卡住
+    # 5 個且其中一個失效時就永遠無法回復（見 2026-09-03 計畫 final review 的
+    # cap-at-5 + clear-list 設計初衷）。
+    bad = client.get("/compare", params={"ids": f"{p1_id},{p2_id},999999999"})
+    assert bad.status_code == 200
+    assert "清空比較清單" in bad.text
