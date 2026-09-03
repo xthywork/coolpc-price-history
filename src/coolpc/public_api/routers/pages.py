@@ -58,7 +58,6 @@ def search_page(
         rows.append({
             "product": p,
             "category": session.get(Category, p.category_id),
-            "stats": compute_product_stats(session, p.id),
         })
 
     query_params = {k: v for k, v in {
