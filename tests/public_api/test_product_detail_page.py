@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from coolpc.db.models import Base, Category, Subcategory, Product, ProductName, PriceHistory
+from coolpc.db.models import Base, Category, Subcategory, Product, ProductName, PriceHistory, ScrapeSnapshot
 from coolpc.public_api.app import app
 from coolpc.public_api.dependencies import get_session
 
@@ -67,26 +67,6 @@ def test_product_detail_page_404_for_missing():
     assert resp.status_code == 404
 
 
-def test_product_detail_page_shows_same_category_quick_compare():
-    client, Session_ = _make_client()
-    t = datetime.datetime(2026, 2, 1)
-    with Session_() as session:
-        cat = Category(name="顯示卡VGA")
-        sub = Subcategory(name="NVIDIA", category=cat)
-        session.add_all([cat, sub])
-        session.flush()
-        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="A卡",
-                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
-        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="B卡",
-                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
-        session.add_all([p1, p2])
-        session.commit()
-        pid = p1.id
-
-    resp = client.get(f"/products/{pid}")
-    assert "B卡" in resp.text
-
-
 def test_product_detail_page_404_for_merged_away_product():
     client, Session_ = _make_client()
     t = datetime.datetime(2026, 2, 1)
@@ -108,3 +88,89 @@ def test_product_detail_page_404_for_merged_away_product():
 
     resp = client.get(f"/products/{source_id}")
     assert resp.status_code == 404
+
+
+def test_product_detail_price_table_shows_only_current_high_low_change():
+    client, Session_ = _make_client()
+    t1 = datetime.datetime(2026, 1, 1)
+    t2 = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="價格表格簡化測試",
+                   current_price=18990, is_active=True, first_seen_at=t1, last_seen_at=t2, created_at=t1)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t1, last_seen_at=t2))
+        snap = ScrapeSnapshot(fetched_at=t1, scrape_type="scheduled", status="success", created_at=t1)
+        session.add(snap)
+        session.flush()
+        session.add(PriceHistory(product_id=p.id, price=20000, scraped_at=t1, snapshot_id=snap.id))
+        session.add(PriceHistory(product_id=p.id, price=18990, scraped_at=t2, snapshot_id=snap.id))
+        session.commit()
+        product_id = p.id
+
+    resp = client.get(f"/products/{product_id}")
+    assert resp.status_code == 200
+    assert "上次價格" not in resp.text
+    assert "7 天最低" not in resp.text
+    assert "30 天最低" not in resp.text
+    assert "90 天最低" not in resp.text
+    assert "歷史最低" in resp.text
+    assert "漲跌" in resp.text
+
+
+def test_product_detail_chart_has_no_apply_button_and_uses_change_listener():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="走勢圖自動更新測試",
+                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+        product_id = p.id
+
+    resp = client.get(f"/products/{product_id}")
+    assert resp.status_code == 200
+    assert 'id="rangeCustom"' not in resp.text
+    assert ">套用<" not in resp.text
+    assert "rangeStart" in resp.text and "'change'" in resp.text
+
+
+def test_product_detail_compare_checkbox_replaces_same_category_dropdown():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較勾選測試",
+                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+        product_id = p.id
+
+    resp = client.get(f"/products/{product_id}")
+    assert resp.status_code == 200
+    assert 'id="compareCheckbox"' in resp.text
+    assert 'id="compareAdd"' not in resp.text
+    assert "addCompare(" not in resp.text
+
+
+def test_base_html_exposes_shared_compare_cart_helper():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "coolpcCompare" in resp.text
+    assert 'id="compareNavLink"' in resp.text

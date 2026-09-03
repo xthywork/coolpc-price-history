@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ product.current_name }} - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
-<h1>{{ product.current_name }}</h1>
+<h1>{{ product.current_name }}
+  <label style="font-size:14px;font-weight:normal;margin-left:12px;">
+    <input type="checkbox" id="compareCheckbox"> 加入比較
+  </label>
+</h1>
 <p>分類：{{ category.name }} / {{ subcategory.name }}　狀態：{{ "在售" if product.is_active else "已下架" }}</p>
 <p>歷史名稱：{{ historical_names | join("、") }}</p>
 <p>第一次出現：{{ product.first_seen_at.strftime("%Y-%m-%d %H:%M") }}　最後一次出現：{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</p>
 
 <table>
   <tr><th>目前價格</th><td>${{ "{:,}".format(product.current_price) }}</td></tr>
-  <tr><th>上次價格</th><td>{% if stats.previous_price %}${{ "{:,}".format(stats.previous_price) }}{% else %}-{% endif %}</td></tr>
-  <tr><th>漲跌</th><td>{% if stats.change_amount %}{{ "%+d"|format(stats.change_amount) }} ({{ "%.1f"|format(stats.change_percent) }}%){% else %}-{% endif %}</td></tr>
-  <tr><th>7 天最低 / 最高</th><td>{{ stats.low_7d or "-" }} / {{ stats.high_7d or "-" }}</td></tr>
-  <tr><th>30 天最低 / 最高</th><td>{{ stats.low_30d or "-" }} / {{ stats.high_30d or "-" }}</td></tr>
-  <tr><th>90 天最低 / 最高</th><td>{{ stats.low_90d or "-" }} / {{ stats.high_90d or "-" }}</td></tr>
   <tr><th>歷史最低 / 最高</th><td>${{ "{:,}".format(stats.all_time_low) }} / ${{ "{:,}".format(stats.all_time_high) }}</td></tr>
+  <tr><th>漲跌</th><td>{% if stats.change_amount %}{{ "%+d"|format(stats.change_amount) }} ({{ "%.1f"|format(stats.change_percent) }}%){% else %}-{% endif %}</td></tr>
 </table>
 
 <h2>價格走勢</h2>
@@ -23,18 +23,8 @@
   <button data-range="90">90天</button>
   <button data-range="all">全部</button>
   自訂：<input type="date" id="rangeStart"> ~ <input type="date" id="rangeEnd">
-  <button id="rangeCustom" type="button">套用</button>
 </div>
 <canvas id="priceChart" height="100"></canvas>
-
-<h2>加入比較</h2>
-<select id="compareAdd">
-  <option value="">選擇同分類商品加入比較...</option>
-  {% for p in same_category_products %}
-  <option value="{{ p.id }}">{{ p.current_name }}</option>
-  {% endfor %}
-</select>
-<button type="button" onclick="addCompare()">加入比較</button>
 
 <h2>歷史價格列表</h2>
 <table>
@@ -86,21 +76,28 @@ document.querySelectorAll('button[data-range]').forEach(btn => {
   });
 });
 
-document.getElementById('rangeCustom').addEventListener('click', () => {
+function loadCustomRange() {
   const startVal = document.getElementById('rangeStart').value;
   const endVal = document.getElementById('rangeEnd').value;
+  if (!startVal && !endVal) return;
   // <input type=date> 只給日期，結束日要補到當天 23:59:59 才不會漏掉當天資料
   loadPrices({
     start: startVal ? `${startVal}T00:00:00` : '',
     end: endVal ? `${endVal}T23:59:59` : '',
   });
-});
-
-function addCompare() {
-  const sel = document.getElementById('compareAdd');
-  if (!sel.value) return;
-  window.location.href = `/compare?ids=${productId},${sel.value}`;
 }
+document.getElementById('rangeStart').addEventListener('change', loadCustomRange);
+document.getElementById('rangeEnd').addEventListener('change', loadCustomRange);
+
+const compareCheckbox = document.getElementById('compareCheckbox');
+compareCheckbox.checked = window.coolpcCompare.has(productId);
+compareCheckbox.addEventListener('change', () => {
+  if (compareCheckbox.checked) {
+    window.coolpcCompare.add(productId);
+  } else {
+    window.coolpcCompare.remove(productId);
+  }
+});
 
 loadPrices({ days: 30 });
 </script>

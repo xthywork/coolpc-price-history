@@ -109,18 +109,9 @@ def product_detail_page(
         .order_by(ProductName.first_seen_at).all()
     ]
     history = list(reversed(get_price_history(session, product.id)))
-    same_category = (
-        session.query(Product)
-        .filter(Product.category_id == product.category_id, Product.id != product.id,
-                Product.merged_into_id.is_(None))
-        .order_by(Product.last_seen_at.desc())
-        .limit(20)
-        .all()
-    )
     return templates.TemplateResponse(request, "product_detail.html", {
         "product": product, "category": category, "subcategory": subcategory,
         "stats": stats, "historical_names": names, "history": history,
-        "same_category_products": same_category,
     })
 
 

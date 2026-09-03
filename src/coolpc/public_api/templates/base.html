@@ -24,10 +24,43 @@
 <body>
 <header>
   <a href="/">商品搜尋</a>
-  <a href="/compare">商品比較</a>
+  <a href="/compare" id="compareNavLink">商品比較</a>
 </header>
 <main>
 {% block content %}{% endblock %}
 </main>
+<script>
+window.coolpcCompare = {
+  _key: 'coolpc_compare_ids',
+  _read() {
+    try {
+      const raw = localStorage.getItem(this._key);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  },
+  _write(ids) {
+    try { localStorage.setItem(this._key, JSON.stringify(ids)); } catch (e) {}
+  },
+  has(id) { return this._read().includes(id); },
+  add(id) {
+    const ids = this._read();
+    if (!ids.includes(id)) { ids.push(id); this._write(ids); }
+    this._updateNav();
+  },
+  remove(id) {
+    const ids = this._read().filter(x => x !== id);
+    this._write(ids);
+    this._updateNav();
+  },
+  _updateNav() {
+    const link = document.getElementById('compareNavLink');
+    if (!link) return;
+    const ids = this._read();
+    link.textContent = ids.length ? `商品比較 (${ids.length})` : '商品比較';
+    link.href = ids.length ? `/compare?ids=${ids.join(',')}` : '/compare';
+  },
+};
+window.coolpcCompare._updateNav();
+</script>
 </body>
 </html>
