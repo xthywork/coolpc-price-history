@@ -157,3 +157,67 @@ def test_ingest_snapshot_marks_partial_and_skips_delisting_on_sharp_drop():
     assert snap2.delisted_products == 0
     # 原本 10 個商品全部仍應維持 is_active=True，即使有 8 個沒出現在這次快照
     assert session.query(Product).filter_by(is_active=True).count() == 10
+
+    # 迴歸測試（第二次修正波）：若原站格式問題持續存在，第三次快照仍然只
+    # 解析到 2 個商品。此時 guard 的基準必須繼續沿用「上一次真正成功」的
+    # 快照（snap1 的 10 個），而不是拿 snap2 那個「已經是 partial」的 2 個
+    # 當基準——否則 2 不低於 2 的 70%，guard 不會觸發，本次會被誤判為
+    # success 並真的執行下架，把 snap2 保護住的 8 個商品全部下架掉。
+    t2 = datetime.datetime(2026, 2, 1, 12, 0)
+    snap3 = ingest_snapshot(session, _snap(t2, [
+        ParsedProduct("顯示卡VGA", "NVIDIA", "商品0", 1000, None, "◆"),
+        ParsedProduct("顯示卡VGA", "NVIDIA", "商品1", 1001, None, "◆"),
+    ]), scrape_type="scheduled", raw_html_path=None)
+    session.commit()
+
+    assert snap3.status == "partial"
+    assert snap3.delisted_products == 0
+    assert session.query(Product).filter_by(is_active=True).count() == 10
+
+
+def test_ingest_snapshot_reimport_partial_snapshot_is_idempotent():
+    """迴歸測試（第二次修正波，Bug 2）：一份快照第一次匯入時被 I6 guard
+    正確標記為 partial（商品數遠低於前一次成功快照）。若之後用同一個
+    fetched_at 重新匯入同一份內容（例如 import-dir 補匯到重疊的日期範圍），
+    不應該重新建立 ScrapeSnapshot 或重複寫入 PriceHistory——防重檢查必須
+    也把 "partial" 狀態算進去，不能只認 "success"。"""
+    session = _session()
+    t0 = datetime.datetime(2026, 2, 1)
+    t1 = datetime.datetime(2026, 2, 1, 6, 0)
+
+    baseline = ingest_snapshot(session, _snap(t0, [
+        ParsedProduct("顯示卡VGA", "NVIDIA", f"商品{i}", 1000 + i, None, "◆")
+        for i in range(10)
+    ]), scrape_type="manual", raw_html_path=None)
+    session.commit()
+    assert baseline.status == "success"
+
+    partial_products = [
+        ParsedProduct("顯示卡VGA", "NVIDIA", "商品0", 1000, None, "◆"),
+        ParsedProduct("顯示卡VGA", "NVIDIA", "商品1", 1001, None, "◆"),
+    ]
+    snap2 = ingest_snapshot(session, _snap(t1, partial_products), scrape_type="scheduled", raw_html_path="/p.html")
+    session.commit()
+    assert snap2.status == "partial"
+    first_id = snap2.id
+
+    affected_product_ids = [
+        p.id for p in session.query(Product)
+        .filter(Product.current_name.in_(["商品0", "商品1"]))
+        .all()
+    ]
+    history_counts_before = {
+        pid: session.query(PriceHistory).filter_by(product_id=pid).count()
+        for pid in affected_product_ids
+    }
+    assert session.query(ScrapeSnapshot).filter_by(fetched_at=t1).count() == 1
+
+    # 完全相同的內容（同一個 fetched_at）再匯入一次，模擬 import-dir 重疊補匯
+    snap3 = ingest_snapshot(session, _snap(t1, partial_products), scrape_type="scheduled", raw_html_path="/p.html")
+    session.commit()
+
+    assert snap3.id == first_id
+    assert snap3.status == "partial"
+    assert session.query(ScrapeSnapshot).filter_by(fetched_at=t1).count() == 1
+    for pid in affected_product_ids:
+        assert session.query(PriceHistory).filter_by(product_id=pid).count() == history_counts_before[pid]

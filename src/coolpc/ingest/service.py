@@ -102,22 +102,35 @@ def ingest_snapshot(
     # 歷史檔案（或 import-dir 匯入到與先前重疊的日期範圍，README 記載的常見
     # 補匯流程）會用同一個 fetched_at 再次呼叫本函式；若不做防重，會為每個
     # 商品重複建立 PriceHistory，悄悄地把所有價格圖表、previous_price/
-    # change_amount 統計都弄成兩倍。這裡做成 idempotent no-op：已有成功匯入
-    # 紀錄就直接回傳既有的 ScrapeSnapshot，不重新處理。
+    # change_amount 統計都弄成兩倍。這裡做成 idempotent no-op：已有成功或
+    # partial 匯入紀錄就直接回傳既有的 ScrapeSnapshot，不重新處理（partial
+    # 也要算，否則第一次被 I6 guard 標記為 partial 的快照，重新匯入同一個
+    # fetched_at 時會找不到既有紀錄而重複建立 PriceHistory）。
     existing = (
         session.query(ScrapeSnapshot)
-        .filter_by(fetched_at=parsed.fetched_at, status="success")
+        .filter(
+            ScrapeSnapshot.fetched_at == parsed.fetched_at,
+            ScrapeSnapshot.status.in_(["success", "partial"]),
+        )
         .one_or_none()
     )
     if existing is not None:
         return existing
 
-    # I6: 在建立本次快照之前，先找出「上一筆成功或部分成功」的快照，用它的
+    # I6: 在建立本次快照之前，先找出「上一筆真正成功」的快照，用它的
     # total_products 當作基準，判斷本次快照是否疑似「只解析到一部分」
     # （例如原站 HTML 結構局部改版，某些 <select> 區塊解析失敗）。
+    # 注意：這裡刻意只看 status == "success"，不能包含 "partial"——否則一旦
+    # 發生一次 partial（商品數被砍到只剩一小部分），下一次比對會拿那次
+    # 「已經很低」的商品數當基準，若解析問題還沒修好、下一次商品數跟上次
+    # 差不多，就不會再低於 70%，guard 會誤判為「成功」而真的執行下架，
+    # 把上一次正確保護住的商品全部下架——等於讓 guard 自己的保護動作，
+    # 在下一輪把門檻悄悄降低而失效。只認 "success" 可以確保：一旦發生
+    # partial，之後每一次都持續跟「最後一次真正健康」的基準比較，直到真的
+    # 恢復到基準的 70% 以上為止。
     prior_successful = (
         session.query(ScrapeSnapshot)
-        .filter(ScrapeSnapshot.status.in_(["success", "partial"]))
+        .filter(ScrapeSnapshot.status == "success")
         .order_by(ScrapeSnapshot.fetched_at.desc())
         .first()
     )
