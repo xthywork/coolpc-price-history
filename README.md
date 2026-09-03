@@ -50,7 +50,7 @@ uv sync
 uv run alembic upgrade head
 ```
 
-會在 `data/coolpc.db` 建立所有資料表與 FTS5 全文索引。`data/raw_html/` 目錄
+會在 `data/coolpc.db` 建立所有資料表。`data/raw_html/` 目錄
 用於永久保存每次抓取的原始 HTML，請確保有足夠的磁碟空間並定期備份 `data/`
 整個目錄（資料庫 + 原始 HTML）。
 

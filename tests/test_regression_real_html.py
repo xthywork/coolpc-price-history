@@ -2,13 +2,19 @@ import glob
 import os
 import subprocess
 import sys
-from sqlalchemy import create_engine, text, func
+import pytest
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 from coolpc.db.models import Product, ProductName, PriceHistory, Category
 from coolpc.parser.html_parser import parse_html
 from coolpc.ingest.service import ingest_snapshot
 
-SAMPLE_DIR = "/home/xthybot/coolpc/download"
+# I10: 這份端對端回歸測試需要一份不在版本控制內的真實原價屋 HTML 語料庫。
+# 預設路徑只在原作者的開發機上存在；其他機器（CI、其他開發者）應該可以
+# 透過環境變數指定語料庫位置，找不到時要 skip 而不是直接測試失敗。
+SAMPLE_DIR = os.environ.get("COOLPC_SAMPLE_DIR", "/home/xthybot/coolpc/download")
+if not os.path.isdir(SAMPLE_DIR):
+    pytest.skip(f"real HTML corpus not found at {SAMPLE_DIR}", allow_module_level=True)
 
 
 def _session(tmp_path):
@@ -54,17 +60,6 @@ def test_import_real_chronological_sequence_without_errors_or_data_loss(tmp_path
 
     # 舊名稱不會消失
     assert session.query(ProductName).count() >= total_products
-
-    # FTS5 觸發器在真實批次匯入規模下仍正確同步（不只是 Task 4 的小規模單元測試）。
-    # Task 4 的觸發器把每個名稱索引成「整串原文 + 每個重疊 2-gram」多筆記錄，
-    # 不是 1:1，所以這裡驗證「每個名稱至少有對應記錄」而非精確筆數相等。
-    fts_count = session.execute(text("SELECT COUNT(*) FROM products_fts")).scalar()
-    product_names_count = session.query(ProductName).count()
-    assert fts_count >= product_names_count
-    distinct_indexed_products = session.execute(
-        text("SELECT COUNT(DISTINCT product_id) FROM products_fts")
-    ).scalar()
-    assert distinct_indexed_products == session.query(Product).count()
 
     # 統計數字內部一致
     for s in snapshots:
