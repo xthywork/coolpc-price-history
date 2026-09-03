@@ -26,9 +26,6 @@
   <a href="/">商品搜尋</a>
   <a href="/compare" id="compareNavLink">商品比較</a>
 </header>
-<main>
-{% block content %}{% endblock %}
-</main>
 <script>
 window.coolpcCompare = {
   _key: 'coolpc_compare_ids',
@@ -62,5 +59,8 @@ window.coolpcCompare = {
 };
 window.coolpcCompare._updateNav();
 </script>
+<main>
+{% block content %}{% endblock %}
+</main>
 </body>
 </html>
