@@ -1,10 +1,15 @@
 import datetime
+import os
 import pytest
 from bs4 import BeautifulSoup
 from coolpc.parser.html_parser import decode_html, parse_fetched_at
 from coolpc.parser.models import ParseError
 
-SAMPLE = "/home/xthybot/coolpc/download/2026-02-01-21-40.html"
+# I10: 見 tests/test_regression_real_html.py 的說明。
+SAMPLE_DIR = os.environ.get("COOLPC_SAMPLE_DIR", "/home/xthybot/coolpc/download")
+if not os.path.isdir(SAMPLE_DIR):
+    pytest.skip(f"real HTML corpus not found at {SAMPLE_DIR}", allow_module_level=True)
+SAMPLE = f"{SAMPLE_DIR}/2026-02-01-21-40.html"
 
 def test_decode_html_produces_correct_chinese_text():
     with open(SAMPLE, "rb") as f:

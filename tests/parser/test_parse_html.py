@@ -1,13 +1,18 @@
+import os
 import pytest
 from coolpc.parser.html_parser import parse_html, decode_html, SUMMARY_COUNT_PATTERN
 from coolpc.parser.models import ParseError
 from bs4 import BeautifulSoup
 
-SAMPLE = "/home/xthybot/coolpc/download/2026-02-01-21-40.html"
+# I10: 見 tests/test_regression_real_html.py 的說明。
+SAMPLE_DIR = os.environ.get("COOLPC_SAMPLE_DIR", "/home/xthybot/coolpc/download")
+if not os.path.isdir(SAMPLE_DIR):
+    pytest.skip(f"real HTML corpus not found at {SAMPLE_DIR}", allow_module_level=True)
+SAMPLE = f"{SAMPLE_DIR}/2026-02-01-21-40.html"
 # 真實案例：這份快照的「滑鼠｜鼠墊｜數位板」分類，有 5 個羅技賽車方向盤
 # <option> 直接是 <select> 的子節點，沒有被任何 <optgroup> 包住，出現在
 # 第一個 <optgroup> 之前。
-ORPHAN_OPTION_SAMPLE = "/home/xthybot/coolpc/download/2026-05-05-18-00.html"
+ORPHAN_OPTION_SAMPLE = f"{SAMPLE_DIR}/2026-05-05-18-00.html"
 
 
 def test_parse_html_full_snapshot():

@@ -1,11 +1,16 @@
 import glob
+import os
 import shutil
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from coolpc.db.models import Base, Product
 from coolpc.scraper.run import import_html_file, import_html_dir
 
-SAMPLE_DIR = "/home/xthybot/coolpc/download"
+# I10: 見 tests/test_regression_real_html.py 的說明。
+SAMPLE_DIR = os.environ.get("COOLPC_SAMPLE_DIR", "/home/xthybot/coolpc/download")
+if not os.path.isdir(SAMPLE_DIR):
+    pytest.skip(f"real HTML corpus not found at {SAMPLE_DIR}", allow_module_level=True)
 
 def _session_factory():
     engine = create_engine("sqlite:///:memory:")

@@ -1,4 +1,5 @@
 import os
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from coolpc.db.models import Base, Category, ScrapeSnapshot
@@ -6,7 +7,11 @@ from coolpc.scraper.run import run_scrape, ScrapeSkipped
 from coolpc.scraper.lock import ScraperLock
 from coolpc.scraper.fetcher import FetchError
 
-SAMPLE = "/home/xthybot/coolpc/download/2026-02-01-21-40.html"
+# I10: 見 tests/test_regression_real_html.py 的說明。
+SAMPLE_DIR = os.environ.get("COOLPC_SAMPLE_DIR", "/home/xthybot/coolpc/download")
+if not os.path.isdir(SAMPLE_DIR):
+    pytest.skip(f"real HTML corpus not found at {SAMPLE_DIR}", allow_module_level=True)
+SAMPLE = f"{SAMPLE_DIR}/2026-02-01-21-40.html"
 
 def _session_factory():
     engine = create_engine("sqlite:///:memory:")
