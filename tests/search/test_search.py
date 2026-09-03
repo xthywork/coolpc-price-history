@@ -152,3 +152,44 @@ def test_search_pagination():
     assert total == 5
     assert len(page1) == 2 and len(page2) == 2
     assert {p.id for p in page1}.isdisjoint({p.id for p in page2})
+
+
+def test_search_by_keyword_with_space_matches_literal_space_in_name():
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    _add(session, cat, sub, "Synology HAT3300 4TB【限搭NAS主機】", 6890, True, t)
+    session.commit()
+
+    # 名稱本身就含空白，"RTX 5070" 整段仍要能比對到；另一個商品的名稱完全
+    # 不含 "RTX"、"5070" 這兩個 token（也不含 "RTX 5070" 整段），確保這裡
+    # 驗證的是「整段比對」本身有效，不會被下面測試的 OR token 語意混淆。
+    results, total = search_products(session, SearchFilters(q="RTX 5070"))
+    assert total == 1
+    assert "5070" in results[0].current_name
+
+
+def test_search_by_keyword_with_space_also_means_or():
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    _add(session, cat, sub, "MSI RTX 5080 GAMING 16G", 28990, True, t)
+    _add(session, cat, sub, "Synology DS923+", 15990, True, t)
+    session.commit()
+
+    # "RTX 5090" 不是任何商品的完整子字串，但拆成 "RTX" / "5090" 後
+    # "RTX" 應該用 OR 語意比對到兩張顯卡（5090 本身查無結果不影響 OR）
+    results, total = search_products(session, SearchFilters(q="RTX 5090"))
+    names = {p.current_name for p in results}
+    assert total == 2
+    assert "ASUS RTX 5070 PRIME 12G" in names
+    assert "MSI RTX 5080 GAMING 16G" in names
+    assert "Synology DS923+" not in names

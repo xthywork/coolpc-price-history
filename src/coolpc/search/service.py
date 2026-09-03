@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from coolpc.db.models import Product, ProductName
 
@@ -34,10 +35,14 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
 
     if filters.q:
+        # 空白分隔的每個片段各自視為 OR 條件，同時保留整段字串本身的比對
+        # （名稱本來就含空白時，例如「RTX 5070」，仍要能整段比對到）。
+        tokens = filters.q.split()
+        patterns = {filters.q, *tokens}
         matched_ids = [
             row[0] for row in
             session.query(ProductName.product_id)
-            .filter(ProductName.name.like(f"%{filters.q}%"))
+            .filter(or_(*[ProductName.name.like(f"%{p}%") for p in patterns]))
             .distinct()
             .all()
         ]
