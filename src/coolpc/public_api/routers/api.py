@@ -2,7 +2,7 @@ from __future__ import annotations
 import datetime as dt
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from coolpc.public_api.dependencies import get_session
+from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
 from coolpc.public_api import schemas
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
@@ -61,10 +61,7 @@ def list_products(
 
 
 @router.get("/products/{product_id}", response_model=schemas.ProductDetail)
-def get_product(product_id: int, session: Session = Depends(get_session)):
-    product = session.get(Product, product_id)
-    if product is None or product.merged_into_id is not None:
-        raise HTTPException(status_code=404, detail="商品不存在")
+def get_product(product: Product = Depends(get_visible_product), session: Session = Depends(get_session)):
     category = session.get(Category, product.category_id)
     subcategory = session.get(Subcategory, product.subcategory_id)
     stats = compute_product_stats(session, product.id)
@@ -86,28 +83,22 @@ def get_product(product_id: int, session: Session = Depends(get_session)):
 
 @router.get("/products/{product_id}/prices", response_model=list[schemas.PricePoint])
 def get_product_prices(
-    product_id: int,
+    product: Product = Depends(get_visible_product),
     start: dt.datetime | None = None,
     end: dt.datetime | None = None,
     days: int | None = None,
     session: Session = Depends(get_session),
 ):
-    product = session.get(Product, product_id)
-    if product is None or product.merged_into_id is not None:
-        raise HTTPException(status_code=404, detail="商品不存在")
     effective_start = start
     if days is not None and start is None:
         effective_start = dt.datetime.utcnow() - dt.timedelta(days=days)
-    history = get_price_history(session, product_id, start=effective_start, end=end)
+    history = get_price_history(session, product.id, start=effective_start, end=end)
     return [schemas.PricePoint(scraped_at=h.scraped_at, price=h.price) for h in history]
 
 
 @router.get("/products/{product_id}/stats", response_model=schemas.ProductStatsOut)
-def get_product_stats(product_id: int, session: Session = Depends(get_session)):
-    product = session.get(Product, product_id)
-    if product is None or product.merged_into_id is not None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-    stats = compute_product_stats(session, product_id)
+def get_product_stats(product: Product = Depends(get_visible_product), session: Session = Depends(get_session)):
+    stats = compute_product_stats(session, product.id)
     return schemas.ProductStatsOut(**stats.__dict__)
 
 
@@ -124,7 +115,7 @@ def compare_products(ids: str, session: Session = Depends(get_session)):
     series: list[schemas.ComparePricePoint] = []
     for pid in product_ids:
         product = session.get(Product, pid)
-        if product is None or product.merged_into_id is not None:
+        if not _is_visible(product):
             raise HTTPException(status_code=404, detail=f"商品不存在: {pid}")
         stats = compute_product_stats(session, pid)
         items.append(schemas.CompareItem(

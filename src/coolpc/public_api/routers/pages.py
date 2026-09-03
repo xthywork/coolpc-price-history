@@ -1,10 +1,10 @@
 from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from coolpc.public_api.dependencies import get_session
+from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
 from coolpc.stats.service import compute_product_stats, get_price_history
@@ -87,10 +87,11 @@ def search_page(
 
 
 @router.get("/products/{product_id}")
-def product_detail_page(request: Request, product_id: int, session: Session = Depends(get_session)):
-    product = session.get(Product, product_id)
-    if product is None or product.merged_into_id is not None:
-        raise HTTPException(status_code=404, detail="商品不存在")
+def product_detail_page(
+    request: Request,
+    product: Product = Depends(get_visible_product),
+    session: Session = Depends(get_session),
+):
     category = session.get(Category, product.category_id)
     subcategory = session.get(Subcategory, product.subcategory_id)
     stats = compute_product_stats(session, product.id)
@@ -130,7 +131,7 @@ def compare_page(request: Request, ids: str | None = None, session: Session = De
         if error is None:
             for pid in product_ids:
                 product = session.get(Product, pid)
-                if product is None or product.merged_into_id is not None:
+                if not _is_visible(product):
                     error = f"商品不存在: {pid}"
                     items = []
                     break
