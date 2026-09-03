@@ -74,8 +74,22 @@ def upgrade() -> None:
             DELETE FROM products_fts WHERE product_id = old.product_id AND source_name = old.name;
         END
     """)
+    # WHEN OLD.name IS NOT NEW.name guards this trigger so it only recomputes
+    # the FTS entry (delete whole-text+bigram rows, reinsert) when the name
+    # text itself actually changed. ingest_product (Task 8) touches
+    # product_names.last_seen_at on every already-seen product on every
+    # scrape -- an UPDATE that never changes name. Without this guard the
+    # trigger unconditionally re-derived the full bigram expansion on every
+    # such no-op touch; at real corpus scale (thousands of unchanged
+    # products re-touched on every snapshot) that turned into unbounded,
+    # ever-growing FTS5 shadow-table churn/fragmentation and made batch
+    # ingest catastrophically slow (observed: a single file's ingest
+    # ballooning from ~9s to 369s after only 3-4 snapshots). See
+    # tests/test_regression_real_html.py and tests/db/test_fts.py.
     op.execute(f"""
-        CREATE TRIGGER product_names_au AFTER UPDATE ON product_names BEGIN
+        CREATE TRIGGER product_names_au AFTER UPDATE ON product_names
+        WHEN OLD.name IS NOT NEW.name
+        BEGIN
             DELETE FROM products_fts WHERE product_id = old.product_id AND source_name = old.name;
             INSERT INTO products_fts(product_id, source_name, name)
             VALUES (new.product_id, new.name, new.name);

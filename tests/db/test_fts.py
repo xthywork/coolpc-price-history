@@ -146,3 +146,105 @@ def test_fts_delete_and_update_sync_rows(tmp_path, monkeypatch):
         # with no extra rows surviving from the deleted old_name.
         updated_count = _fts_row_count(session, p.id, new_name)
         assert updated_count == len(new_name)
+
+
+def test_fts_update_that_does_not_change_name_is_a_no_op(tmp_path, monkeypatch):
+    """A product_names UPDATE that only touches a non-name column (e.g.
+    last_seen_at, bumped on every scrape for every already-seen product --
+    see ingest_product, Task 8) must NOT re-derive the FTS entry.
+
+    This is what tests/test_regression_real_html.py's real-corpus batch
+    import surfaced: the AU trigger originally had no WHEN guard, so it
+    unconditionally deleted+reinserted the whole-text+bigram rows on every
+    such no-op touch. At real scale (thousands of already-seen products
+    re-touched on every snapshot) that churn/fragmented the FTS5 shadow
+    tables badly enough that a single file's ingest time went from ~9s to
+    369s after only 3-4 snapshots. The fix added `WHEN OLD.name IS NOT
+    NEW.name` to the trigger; this test locks that guard in place.
+    """
+    db_path = tmp_path / "fts_noop_update.db"
+    monkeypatch.setenv("COOLPC_DB_PATH", str(db_path))
+    _upgrade_head(db_path)
+    engine = get_engine(str(db_path))
+    Session = get_session_factory(engine)
+    now = datetime.datetime(2026, 2, 1)
+    later = datetime.datetime(2026, 2, 2)
+    name = "Synology HAT3300 4TB PLUS系列(3.5吋/5400轉/三年保固)【限搭NAS主機】"
+
+    with Session() as session:
+        cat = Category(name="固態硬碟")
+        sub = Subcategory(name="NAS碟", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id,
+                     current_name=name, current_price=6890, is_active=True,
+                     first_seen_at=now, last_seen_at=now, created_at=now)
+        session.add(p)
+        session.flush()
+        pn = ProductName(product_id=p.id, name=name,
+                          first_seen_at=now, last_seen_at=now)
+        session.add(pn)
+        session.commit()
+
+        # Sentinel: insert another product/name AFTER the target so the
+        # table's rowid high-water mark sits above the target's rows. This
+        # matters because SQLite assigns a plain rowid table's new rowid as
+        # one more than the CURRENT max in the table. Without this sentinel,
+        # the target's rows are the only content in the table, so a buggy
+        # delete-then-reinsert of the exact same name would coincidentally
+        # reclaim the exact same rowids (1..N) it just freed, making a
+        # before/after rowid comparison pass even when the trigger body DID
+        # run. With the sentinel's rows occupying higher rowids, any
+        # delete-then-reinsert of the target is forced onto brand-new rowids
+        # above the sentinel's -- so identical rowids before/after can only
+        # happen if the trigger body genuinely did not run.
+        cat2 = Category(name="固態硬碟-哨兵")
+        sub2 = Subcategory(name="NAS碟-哨兵", category=cat2)
+        session.add_all([cat2, sub2])
+        session.flush()
+        sentinel_name = "控制組哨兵名稱XYZ789"
+        p2 = Product(category_id=cat2.id, subcategory_id=sub2.id,
+                      current_name=sentinel_name, current_price=1,
+                      is_active=True, first_seen_at=now, last_seen_at=now,
+                      created_at=now)
+        session.add(p2)
+        session.flush()
+        session.add(ProductName(product_id=p2.id, name=sentinel_name,
+                                 first_seen_at=now, last_seen_at=now))
+        session.commit()
+
+        def _fts_rowids():
+            return session.execute(
+                text(
+                    "SELECT rowid FROM products_fts "
+                    "WHERE product_id = :pid AND source_name = :n ORDER BY rowid"
+                ),
+                {"pid": p.id, "n": name},
+            ).fetchall()
+
+        before_count = _fts_row_count(session, p.id, name)
+        assert before_count == len(name)
+        # Capture rowids, not just the count: a delete-then-reinsert of the
+        # SAME name produces the SAME row count (same length, same bigrams)
+        # but FTS5 assigns fresh rowids to the reinserted rows. Identical
+        # rowids before/after is the only way to prove the trigger body
+        # genuinely did not run, as opposed to running and coincidentally
+        # reproducing the same row count.
+        before_rowids = _fts_rowids()
+
+        # Touch only last_seen_at, exactly like ingest_product does for an
+        # already-seen product on every subsequent scrape. name is unchanged.
+        pn.last_seen_at = later
+        session.commit()
+
+        after_count = _fts_row_count(session, p.id, name)
+        assert after_count == before_count
+        after_rowids = _fts_rowids()
+        assert after_rowids == before_rowids
+
+        rows = session.execute(
+            text("SELECT product_id FROM products_fts WHERE products_fts MATCH :q"),
+            {"q": "限搭"},
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] == p.id
