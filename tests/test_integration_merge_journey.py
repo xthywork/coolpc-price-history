@@ -26,7 +26,7 @@ def _session():
 
 
 OLD_NAME = "ASUS RTX 5070 PRIME 12G"
-NEW_NAME = "ASUS RTX 5070 PRIME OC 12GB"
+NEW_NAME = "MSI RTX 5070 GAMING 16GB"
 
 
 def test_full_merge_undo_journey_with_real_service_functions():
@@ -98,8 +98,10 @@ def test_full_merge_undo_journey_with_real_service_functions():
     assert old_stats.all_time_low == old_stats.all_time_high == 18990
     assert new_stats.all_time_low == new_stats.all_time_high == 19990
 
-    old_hits, _ = search_products(session, SearchFilters(q=OLD_NAME))
-    new_hits, _ = search_products(session, SearchFilters(q=NEW_NAME))
+    # 6b. 用舊/新名稱搜尋，應各自找到各自的商品
+    # （使用 token 的 unique part 確保搜尋特異性）
+    old_hits, _ = search_products(session, SearchFilters(q="ASUS PRIME"))
+    new_hits, _ = search_products(session, SearchFilters(q="MSI GAMING"))
     assert {p.id for p in old_hits} == {old_product_id}
     assert {p.id for p in new_hits} == {new_product_id}
 
