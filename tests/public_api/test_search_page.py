@@ -124,3 +124,35 @@ def test_search_page_accepts_blank_form_fields_without_422():
         "min_change_percent": "", "max_change_percent": "", "sort": "last_seen_desc",
     })
     assert resp.status_code == 200
+
+
+def test_search_page_brand_is_dropdown_populated_from_existing_brands():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070",
+                   brand="ASUS", current_price=18990, is_active=True,
+                   first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.commit()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert '<select name="brand"' in resp.text
+    assert 'type="text" name="brand"' not in resp.text
+    assert '<option value="ASUS"' in resp.text
+
+
+def test_search_page_removed_fields_are_gone():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert 'name="category_id"' not in resp.text
+    assert 'name="model"' not in resp.text
+    assert 'name="min_change_percent"' not in resp.text
+    assert 'name="max_change_percent"' not in resp.text
+    assert 'name="subcategory_id"' in resp.text

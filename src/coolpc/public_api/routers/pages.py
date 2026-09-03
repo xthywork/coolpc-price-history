@@ -71,10 +71,17 @@ def search_page(
         for sc, cat in subcategory_rows
     ]
 
+    brands = [
+        row[0] for row in
+        session.query(Product.brand).filter(Product.brand.isnot(None)).distinct()
+        .order_by(Product.brand).all()
+    ]
+
     return templates.TemplateResponse(request, "search.html", {
         "rows": rows,
         "categories": session.query(Category).order_by(Category.name).all(),
         "subcategories": subcategories,
+        "brands": brands,
         "query": {
             "q": q or "", "category_id": category_id, "subcategory_id": subcategory_id,
             "brand": brand, "model": model,
