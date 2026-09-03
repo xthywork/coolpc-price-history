@@ -1,26 +1,27 @@
 {% extends "base.html" %}
-{% block title %}可能需要合併的商品 - 原價屋管理介面{% endblock %}
+{% block title %}合併商品 - 原價屋管理介面{% endblock %}
 {% block content %}
-<h1>可能需要合併的商品</h1>
+<h1>合併商品</h1>
+{% if message %}<p style="color:#15803d">{{ message }}</p>{% endif %}
 <form method="post" action="/similarity-hints/refresh">
   <button type="submit">重新計算相似度候選</button>
 </form>
-<p>以下為系統依名稱相似度找出的候選，僅供參考，請至 <a href="/merge">合併商品</a> 頁面手動確認後才會實際合併。</p>
-<table>
-  <thead><tr><th>相似度</th><th>商品 A</th><th>商品 B</th><th>操作</th></tr></thead>
-  <tbody>
-    {% for row in rows %}
-    <tr>
-      <td>{{ "%.0f"|format(row.hint.score * 100) }}%</td>
-      <td>#{{ row.a.id }} {{ row.a.current_name }}</td>
-      <td>#{{ row.b.id }} {{ row.b.current_name }}</td>
-      <td>
-        <form method="post" action="/similarity-hints/{{ row.hint.id }}/dismiss" style="display:inline">
-          <button type="submit">不是同一商品，忽略</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<p>以下為系統依名稱相似度找出的候選。勾選後可「批量合併」（自動以仍在上架中、或最近更新較新的商品當保留的主商品），或「批量忽略」（標記為不是同一商品，之後不再出現）。</p>
+<form method="post" id="hintsForm">
+  <button type="submit" formaction="/similarity-hints/batch-merge">批量合併</button>
+  <button type="submit" formaction="/similarity-hints/batch-dismiss">批量忽略（不是同一商品）</button>
+  <table>
+    <thead><tr><th></th><th>相似度</th><th>商品 A</th><th>商品 B</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><input type="checkbox" name="hint_ids" value="{{ row.hint.id }}"></td>
+        <td>{{ "%.0f"|format(row.hint.score * 100) }}%</td>
+        <td>#{{ row.a.id }} {{ row.a.current_name }}{% if not row.a.is_active %}（已下架）{% endif %}</td>
+        <td>#{{ row.b.id }} {{ row.b.current_name }}{% if not row.b.is_active %}（已下架）{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
 {% endblock %}
