@@ -1,13 +1,25 @@
 {% extends "base.html" %}
-{% block title %}合併商品 - 原價屋管理介面{% endblock %}
+{% block title %}手動合併 - 原價屋管理介面{% endblock %}
 {% block content %}
-<h1>合併商品</h1>
+<h1>手動合併</h1>
 {% if message %}<p style="color:#15803d">{{ message }}</p>{% endif %}
 {% if error %}<p style="color:#b91c1c">{{ error }}</p>{% endif %}
 
 <form method="post" action="/merge">
-  來源商品 ID（將被合併，舊名稱仍可搜尋）：<input type="number" name="source_id" required>
-  目標商品 ID（合併後保留的主商品，請選擇目前仍持續更新的商品）：<input type="number" name="target_id" required>
+  <p>
+    來源商品（將被合併，舊名稱仍可搜尋）：<br>
+    <input type="text" id="sourceSearch" placeholder="輸入商品名稱搜尋...">
+    <div id="sourceResults"></div>
+    <span id="sourceSelected"></span><br>
+    或直接輸入商品ID（備用）：<input type="number" name="source_id" id="sourceId" required>
+  </p>
+  <p>
+    目標商品（合併後保留的主商品，請選擇目前仍持續更新的商品）：<br>
+    <input type="text" id="targetSearch" placeholder="輸入商品名稱搜尋...">
+    <div id="targetResults"></div>
+    <span id="targetSelected"></span><br>
+    或直接輸入商品ID（備用）：<input type="number" name="target_id" id="targetId" required>
+  </p>
   <button type="submit">合併</button>
 </form>
 
@@ -32,4 +44,40 @@
     {% endfor %}
   </tbody>
 </table>
+
+<script>
+function setupProductSearch(searchInputId, resultsId, idFieldId, selectedId) {
+  const searchInput = document.getElementById(searchInputId);
+  const results = document.getElementById(resultsId);
+  const idField = document.getElementById(idFieldId);
+  const selected = document.getElementById(selectedId);
+  let timer;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = searchInput.value.trim();
+    if (!q) { results.innerHTML = ''; return; }
+    timer = setTimeout(async () => {
+      const resp = await fetch(`/products/search-json?q=${encodeURIComponent(q)}`);
+      const items = await resp.json();
+      results.innerHTML = '';
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.textContent = `#${item.id} ${item.name}（$${item.price}${item.is_active ? '' : '・已下架'}）`;
+        div.style.cursor = 'pointer';
+        div.style.padding = '4px';
+        div.style.borderBottom = '1px solid #e5e7eb';
+        div.addEventListener('click', () => {
+          idField.value = item.id;
+          selected.textContent = `已選擇：${item.name} (#${item.id})`;
+          results.innerHTML = '';
+          searchInput.value = '';
+        });
+        results.appendChild(div);
+      });
+    }, 300);
+  });
+}
+setupProductSearch('sourceSearch', 'sourceResults', 'sourceId', 'sourceSelected');
+setupProductSearch('targetSearch', 'targetResults', 'targetId', 'targetSelected');
+</script>
 {% endblock %}

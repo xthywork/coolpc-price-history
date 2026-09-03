@@ -29,6 +29,18 @@ def product_search(
     })
 
 
+@router.get("/products/search-json")
+def product_search_json(q: str = "", session: Session = Depends(get_session)):
+    if not q.strip():
+        return []
+    filters = SearchFilters(q=q, limit=10)
+    products, _total = search_products(session, filters)
+    return [
+        {"id": p.id, "name": p.current_name, "price": p.current_price, "is_active": p.is_active}
+        for p in products
+    ]
+
+
 @router.get("/merge")
 def merge_form(request: Request, message: str | None = None, error: str | None = None,
                session: Session = Depends(get_session)):

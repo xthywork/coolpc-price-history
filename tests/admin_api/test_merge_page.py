@@ -154,3 +154,47 @@ def test_merge_error_message_with_special_characters_survives_redirect(monkeypat
     # '&amp;'), so compare against the escaped form here - the query-string-level
     # round-trip integrity was already proven above via parse_qs on the raw redirect URL.
     assert str(escape(tricky_message)) in merge_page.text
+
+
+def test_product_search_json_returns_matches_by_name():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 搜尋測試",
+                   current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+        p_id = p.id
+
+    resp = client.get("/products/search-json", params={"q": "搜尋測試"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == p_id
+    assert data[0]["name"] == "ASUS RTX 5070 搜尋測試"
+    assert data[0]["price"] == 18990
+    assert data[0]["is_active"] is True
+
+
+def test_product_search_json_empty_query_returns_empty_list():
+    client, _Session_ = _make_client()
+    resp = client.get("/products/search-json", params={"q": ""})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_merge_page_has_search_inputs_and_fallback_id_inputs():
+    client, _Session_ = _make_client()
+    resp = client.get("/merge")
+    assert resp.status_code == 200
+    assert 'id="sourceSearch"' in resp.text
+    assert 'id="targetSearch"' in resp.text
+    assert 'name="source_id"' in resp.text
+    assert 'name="target_id"' in resp.text
+    assert "備用" in resp.text
