@@ -1,19 +1,6 @@
 {% extends "base.html" %}
 {% block title %}商品搜尋 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
-<script>
-// 改變「每頁顯示幾筆」會整頁 reload；還原成上次操作時的捲動位置，而不是
-// 每次都跳回最上面。放在內容最前面盡早執行，減少畫面先跳頂再跳回去的閃爍。
-(function () {
-  try {
-    const savedScroll = sessionStorage.getItem('coolpc_search_scroll');
-    if (savedScroll !== null) {
-      sessionStorage.removeItem('coolpc_search_scroll');
-      window.scrollTo(0, parseInt(savedScroll, 10));
-    }
-  } catch (e) {}
-})();
-</script>
 <form class="filters" method="get" action="/" id="searchFiltersForm" style="display:block;">
   <div style="display:flex; gap:8px; align-items:center;">
     <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}" style="flex:1; min-width:200px;">
@@ -122,6 +109,21 @@
 </div>
 
 <script>
+// 改變「每頁顯示幾筆」會整頁 reload；還原成上次操作時的捲動位置，而不是
+// 每次都跳回最上面。這段必須放在表格/分頁的 HTML 都解析完之後才執行，
+// 這樣頁面才有足夠高度可以捲過去；放在內容最前面時，這段程式執行的當下
+// 後面的表格還沒被瀏覽器解析出來，頁面還很短，scrollTo 到的位置形同無效，
+// 導致捲動還原看起來完全沒作用。
+(function () {
+  try {
+    const savedScroll = sessionStorage.getItem('coolpc_search_scroll');
+    if (savedScroll !== null) {
+      sessionStorage.removeItem('coolpc_search_scroll');
+      window.scrollTo(0, parseInt(savedScroll, 10));
+    }
+  } catch (e) {}
+})();
+
 function wireCompareCheckbox(cb) {
   const id = parseInt(cb.dataset.id, 10);
   cb.checked = window.coolpcCompare.has(id);

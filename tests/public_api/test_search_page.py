@@ -386,11 +386,13 @@ def test_search_page_preserves_scroll_position_across_page_size_change():
     assert "sessionStorage.setItem('coolpc_search_scroll'" in handler_body
     assert "window.scrollY" in handler_body
     assert ".submit()" in handler_body
-    # 頁面一開始（在其餘內容之前）就要嘗試還原捲動位置，而不是預設留在頂端
+    # 還原捲動位置的程式必須放在表格/分頁的 HTML 都解析完之後才執行，這樣
+    # 頁面才有足夠高度可以捲過去；放在內容最前面同步執行的話，執行當下後面
+    # 的表格還沒被瀏覽器解析出來，頁面還很短，scrollTo 到的位置形同無效。
     restore_pos = resp.text.find("sessionStorage.getItem('coolpc_search_scroll')")
-    form_pos = resp.text.find('id="searchFiltersForm"')
-    assert restore_pos != -1 and form_pos != -1
-    assert restore_pos < form_pos
+    pagination_pos = resp.text.find('class="pagination"')
+    assert restore_pos != -1 and pagination_pos != -1
+    assert restore_pos > pagination_pos
     assert "window.scrollTo(0, parseInt(savedScroll, 10))" in resp.text
 
 
