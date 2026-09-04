@@ -37,7 +37,7 @@ def test_search_page_renders_seeded_product():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
-                    current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=18990, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -63,7 +63,7 @@ def test_search_page_pagination_link_preserves_query():
         for i in range(35):
             name = f"ASUS 商品{i}"
             p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                        current_price=1000 + i, is_active=True, last_seen_at=t, created_at=t)
             session.add(p)
             session.flush()
             session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
@@ -86,7 +86,7 @@ def test_search_page_default_page_size_is_twenty_and_shown_selected():
         for i in range(25):
             name = f"ASUS 分頁測試{i}"
             p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                        current_price=1000 + i, is_active=True, last_seen_at=t, created_at=t)
             session.add(p)
             session.flush()
             session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
@@ -112,7 +112,7 @@ def test_search_page_page_size_all_shows_every_result_on_one_page():
         for i in range(25):
             name = f"ASUS 全部顯示測試{i}"
             p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                        current_price=1000 + i, is_active=True, last_seen_at=t, created_at=t)
             session.add(p)
             session.flush()
             session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
@@ -136,7 +136,7 @@ def test_search_page_pagination_shows_numbered_page_links_and_jump_control():
         for i in range(45):
             name = f"ASUS 頁碼測試{i}"
             p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                        current_price=1000 + i, is_active=True, last_seen_at=t, created_at=t)
             session.add(p)
             session.flush()
             session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
@@ -184,9 +184,9 @@ def test_search_page_subcategory_select_and_filter():
         session.flush()
 
         p1 = Product(category_id=cat1.id, subcategory_id=sub1.id, current_name="顯卡商品A",
-                      current_price=10000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                      current_price=10000, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat2.id, subcategory_id=sub2.id, current_name="主機板商品B",
-                      current_price=5000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                      current_price=5000, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.flush()
         session.add(ProductName(product_id=p1.id, name=p1.current_name, first_seen_at=t, last_seen_at=t))
@@ -219,7 +219,7 @@ def test_search_page_shows_category_display_name_when_set():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="顯示名稱測試商品",
-                    current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -293,7 +293,7 @@ def test_search_page_brand_is_dropdown_populated_from_existing_brands():
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070",
                    brand="ASUS", current_price=18990, is_active=True,
-                   first_seen_at=t, last_seen_at=t, created_at=t)
+                   last_seen_at=t, created_at=t)
         session.add(p)
         session.commit()
 
@@ -426,7 +426,7 @@ def test_search_page_results_table_only_has_four_columns_plus_checkbox():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="表格精簡測試",
-                   current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=18990, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -459,9 +459,9 @@ def test_search_page_shows_global_last_updated_after_result_count():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="更新時間A",
-                    current_price=1000, is_active=True, first_seen_at=t1, last_seen_at=t1, created_at=t1)
+                    current_price=1000, is_active=True, last_seen_at=t1, created_at=t1)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="更新時間B",
-                    current_price=2000, is_active=True, first_seen_at=t2, last_seen_at=t2, created_at=t2)
+                    current_price=2000, is_active=True, last_seen_at=t2, created_at=t2)
         session.add_all([p1, p2])
         session.commit()
 

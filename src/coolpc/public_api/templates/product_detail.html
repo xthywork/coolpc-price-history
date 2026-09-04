@@ -8,7 +8,7 @@
 </h1>
 <p>分類：{{ category.label }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}　狀態：{{ "在售" if product.is_active else "已下架" }}</p>
 <p>歷史名稱：{{ historical_names | join("、") }}</p>
-<p>第一次出現：{{ product.first_seen_at.strftime("%Y-%m-%d %H:%M") }}　最後一次出現：{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</p>
+<p>第一次出現：{{ product.created_at.strftime("%Y-%m-%d %H:%M") }}　最後一次出現：{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</p>
 
 <table>
   <tr><th>目前價格</th><td>${{ "{:,}".format(product.current_price) }}</td></tr>

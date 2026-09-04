@@ -11,7 +11,7 @@ def _session():
 
 def _add(session, cat, sub, name, price, is_active, t, brand=None, model=None):
     p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name, brand=brand,
-                model=model, current_price=price, is_active=is_active, first_seen_at=t,
+                model=model, current_price=price, is_active=is_active,
                 last_seen_at=t, created_at=t)
     session.add(p)
     session.flush()

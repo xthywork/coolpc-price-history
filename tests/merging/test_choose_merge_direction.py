@@ -6,7 +6,7 @@ from coolpc.merging.service import choose_merge_direction
 def _product(id_, is_active, last_seen_at):
     p = Product(
         current_name=f"p{id_}", category_id=1, subcategory_id=1, current_price=100,
-        is_active=is_active, first_seen_at=last_seen_at, last_seen_at=last_seen_at,
+        is_active=is_active, last_seen_at=last_seen_at,
         created_at=last_seen_at,
     )
     p.id = id_

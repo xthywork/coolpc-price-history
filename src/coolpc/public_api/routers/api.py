@@ -86,7 +86,7 @@ def get_product(product: Product = Depends(get_visible_product), session: Sessio
         category_name=category.label, subcategory_name=subcategory.label,
         current_price=product.current_price, previous_price=stats.previous_price,
         change_amount=stats.change_amount, change_percent=stats.change_percent,
-        first_seen_at=product.first_seen_at, last_seen_at=product.last_seen_at,
+        created_at=product.created_at, last_seen_at=product.last_seen_at,
         is_active=product.is_active,
         stats=schemas.ProductStatsOut(**stats.__dict__),
     )

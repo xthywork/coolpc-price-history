@@ -67,7 +67,7 @@ def _seed_product(Session_, name, price, category_name="顯示卡VGA", subcatego
         session.add(sub)
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                    current_price=price, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=price, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))

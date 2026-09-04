@@ -42,7 +42,7 @@ def _session():
 
 def _make_product(session, cat, sub, name, is_active, t):
     p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                current_price=100, is_active=is_active, first_seen_at=t,
+                current_price=100, is_active=is_active,
                 last_seen_at=t, created_at=t)
     session.add(p)
     session.flush()

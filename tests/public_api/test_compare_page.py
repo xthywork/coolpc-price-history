@@ -56,9 +56,9 @@ def test_compare_page_prefills_chips_with_names_not_ids_for_existing_selection()
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="下拉預填測試A",
-                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="下拉預填測試B",
-                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=2000, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.commit()
         p1_id, p2_id = p1.id, p2.id
@@ -92,9 +92,9 @@ def test_compare_page_renders_table_and_chart_for_valid_ids():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="A卡", current_price=1000,
-                     is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="B卡", current_price=2000,
-                     is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.flush()
         session.add(PriceHistory(product_id=p1.id, price=1000, status=None, badges="", scraped_at=t, snapshot_id=1))
@@ -118,15 +118,15 @@ def test_compare_page_rejects_merged_away_product_id():
         session.add_all([cat, sub])
         session.flush()
         other = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Other", current_price=300,
-                         is_active=True, first_seen_at=t0, last_seen_at=t0, created_at=t0)
+                         is_active=True, last_seen_at=t0, created_at=t0)
         session.add(other)
         session.flush()
         target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Target", current_price=200,
-                          is_active=True, first_seen_at=t0, last_seen_at=t1, created_at=t0)
+                          is_active=True, last_seen_at=t1, created_at=t0)
         session.add(target)
         session.flush()
         source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Source (merged)",
-                          current_price=999, is_active=False, first_seen_at=t0, last_seen_at=t0,
+                          current_price=999, is_active=False, last_seen_at=t0,
                           created_at=t0, merged_into_id=target.id)
         session.add(source)
         session.flush()
@@ -152,9 +152,9 @@ def test_compare_page_table_only_has_four_columns():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較精簡A",
-                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較精簡B",
-                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=2000, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.commit()
         p1_id, p2_id = p1.id, p2.id
@@ -184,9 +184,9 @@ def test_compare_page_has_color_dot_before_product_name_and_no_default_legend():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較顏色A",
-                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較顏色B",
-                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=2000, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.commit()
         p1_id, p2_id = p1.id, p2.id
@@ -207,9 +207,9 @@ def test_compare_page_chart_has_range_controls_and_no_apply_button():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較區間A",
-                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較區間B",
-                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=2000, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.commit()
         p1_id, p2_id = p1.id, p2.id
@@ -235,9 +235,9 @@ def test_compare_page_has_clear_link_and_base_html_no_longer_does():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較清空A",
-                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較清空B",
-                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=2000, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.commit()
         p1_id, p2_id = p1.id, p2.id

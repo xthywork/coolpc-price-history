@@ -35,9 +35,9 @@ def test_similarity_hints_page_lists_candidates():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
-                   current_price=100, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=False, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME OC 12GB",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         session.add(SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.85,
@@ -59,9 +59,9 @@ def test_similarity_hints_refresh_creates_new_hints():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
-                   current_price=100, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=False, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME OC 12GB",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.commit()
 
@@ -80,9 +80,9 @@ def test_dismiss_hint_removes_it_from_list():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="商品A獨特字串",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="商品B獨特字串",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8, computed_at=t, dismissed=False)
@@ -108,9 +108,9 @@ def test_batch_merge_hints_merges_selected_pairs_and_dismisses_their_hints():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="舊名稱下架商品",
-                   current_price=100, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=False, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="新名稱在售商品",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.9,
@@ -144,9 +144,9 @@ def test_batch_dismiss_hints_dismisses_selected_without_merging():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="商品A獨特字串批量忽略",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="商品B獨特字串批量忽略",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8,
@@ -183,9 +183,9 @@ def test_similarity_hints_excludes_merged_away_products_beyond_naive_limit():
 
         # 分數最高、但其中一個商品已被合併走的失效候選。
         merged_a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="已合併商品A",
-                            current_price=100, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                            current_price=100, is_active=False, last_seen_at=t, created_at=t)
         merged_b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="已合併商品B",
-                            current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                            current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([merged_a, merged_b])
         session.flush()
         merged_a.merged_into_id = merged_b.id
@@ -195,9 +195,9 @@ def test_similarity_hints_excludes_merged_away_products_beyond_naive_limit():
         # 101 組分數較低、但仍然有效的候選配對。
         for i in range(101):
             pa = Product(category_id=cat.id, subcategory_id=sub.id, current_name=f"有效商品A{i}",
-                         current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                         current_price=100, is_active=True, last_seen_at=t, created_at=t)
             pb = Product(category_id=cat.id, subcategory_id=sub.id, current_name=f"有效商品B{i}",
-                         current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                         current_price=200, is_active=True, last_seen_at=t, created_at=t)
             session.add_all([pa, pb])
             session.flush()
             session.add(SimilarityHint(product_a_id=pa.id, product_b_id=pb.id,
@@ -221,9 +221,9 @@ def test_similarity_hints_page_has_checkbox_and_no_per_row_action_column():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="核取方塊測試A",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="核取方塊測試B",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8,
@@ -254,9 +254,9 @@ def test_similarity_hints_page_stacks_products_vertically_with_score_beside_and_
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="堆疊排版測試A",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="堆疊排版測試B",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8,
@@ -295,9 +295,9 @@ def test_similarity_hints_page_has_merge_all_button_with_confirm_and_reuses_batc
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="全部合併測試A",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="全部合併測試B",
-                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=200, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8,

@@ -74,7 +74,7 @@ def ingest_product(
         category_id=category.id, subcategory_id=subcategory.id,
         current_name=parsed.name, brand=guess_brand(parsed.name), model=guess_model(parsed.name),
         current_status=parsed.status, current_price=parsed.price,
-        is_active=True, first_seen_at=fetched_at, last_seen_at=fetched_at,
+        is_active=True, last_seen_at=fetched_at,
         created_at=fetched_at,
     )
     session.add(product)

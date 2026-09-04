@@ -37,7 +37,7 @@ def _seed(Session_, name, price, t):
             session.add(sub)
             session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
-                    current_price=price, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=price, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
@@ -96,12 +96,12 @@ def test_compare_404_for_merged_away_source_id():
         cat = session.query(Category).filter_by(name="顯示卡VGA").one()
         sub = session.query(Subcategory).filter_by(category_id=cat.id, name="NVIDIA").one()
         target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Target",
-                          current_price=200, is_active=True, first_seen_at=t0, last_seen_at=t1,
+                          current_price=200, is_active=True, last_seen_at=t1,
                           created_at=t0)
         session.add(target)
         session.flush()
         source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Source (merged)",
-                          current_price=999, is_active=False, first_seen_at=t0, last_seen_at=t0,
+                          current_price=999, is_active=False, last_seen_at=t0,
                           created_at=t0, merged_into_id=target.id)
         session.add(source)
         session.flush()

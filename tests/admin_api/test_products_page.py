@@ -42,7 +42,7 @@ def _seed_product(Session_, **overrides):
         defaults = dict(
             category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
             brand="ASUS", model="RTX5070-12G", current_price=18990, is_active=True,
-            first_seen_at=t, last_seen_at=t, created_at=t,
+            last_seen_at=t, created_at=t,
         )
         defaults.update(overrides)
         product = Product(**defaults)
@@ -63,7 +63,7 @@ def _seed_many_products(Session_, count):
         for i in range(count):
             session.add(Product(
                 category_id=cat.id, subcategory_id=sub.id, current_name=f"商品 {i:04d}",
-                current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t,
+                current_price=1000 + i, is_active=True, last_seen_at=t, created_at=t,
             ))
         session.commit()
 

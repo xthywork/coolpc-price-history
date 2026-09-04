@@ -38,7 +38,7 @@ def test_product_detail_page_renders_history_and_chart():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 v2",
-                    current_price=19990, is_active=True, first_seen_at=t0, last_seen_at=t1, created_at=t0)
+                    current_price=19990, is_active=True, last_seen_at=t1, created_at=t0)
         session.add(p)
         session.flush()
         session.add_all([
@@ -70,7 +70,7 @@ def test_product_detail_page_hides_trailing_slash_when_subcategory_name_is_blank
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="無子分類測試商品",
-                    current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -98,11 +98,11 @@ def test_product_detail_page_404_for_merged_away_product():
         session.add_all([cat, sub])
         session.flush()
         target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="目標商品",
-                          current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                          current_price=1000, is_active=True, last_seen_at=t, created_at=t)
         session.add(target)
         session.flush()
         source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="來源商品",
-                          current_price=1000, is_active=False, first_seen_at=t, last_seen_at=t,
+                          current_price=1000, is_active=False, last_seen_at=t,
                           created_at=t, merged_into_id=target.id)
         session.add(source)
         session.commit()
@@ -122,7 +122,7 @@ def test_product_detail_price_table_shows_only_current_high_low_change():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="價格表格簡化測試",
-                   current_price=18990, is_active=True, first_seen_at=t1, last_seen_at=t2, created_at=t1)
+                   current_price=18990, is_active=True, last_seen_at=t2, created_at=t1)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t1, last_seen_at=t2))
@@ -153,7 +153,7 @@ def test_product_detail_chart_has_no_apply_button_and_uses_change_listener():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="走勢圖自動更新測試",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -176,7 +176,7 @@ def test_product_detail_compare_checkbox_replaces_same_category_dropdown():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="比較勾選測試",
-                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=100, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))

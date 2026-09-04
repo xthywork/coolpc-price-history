@@ -19,10 +19,10 @@ def _setup_two_products(session):
 
     source = Product(category_id=cat.id, subcategory_id=sub.id,
                       current_name="ASUS RTX 5070 PRIME 12G", current_price=18990,
-                      is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                      is_active=False, last_seen_at=t, created_at=t)
     target = Product(category_id=cat.id, subcategory_id=sub.id,
                       current_name="ASUS RTX 5070 PRIME OC 12GB", current_price=19990,
-                      is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                      is_active=True, last_seen_at=t, created_at=t)
     session.add_all([source, target])
     session.flush()
     session.add_all([
@@ -73,7 +73,7 @@ def test_merge_into_already_merged_target_raises():
     t = datetime.datetime(2026, 2, 2)
     third = Product(category_id=target.category_id, subcategory_id=target.subcategory_id,
                      current_name="第三個商品", current_price=100, is_active=True,
-                     first_seen_at=t, last_seen_at=t, created_at=t)
+                     last_seen_at=t, created_at=t)
     session.add(third)
     session.commit()
 
@@ -142,11 +142,11 @@ def test_undo_out_of_order_in_merge_chain_is_rejected_then_succeeds_in_order():
     session.flush()
 
     a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="A商品",
-                current_price=1000, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                current_price=1000, is_active=False, last_seen_at=t, created_at=t)
     b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="B商品",
-                current_price=2000, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                current_price=2000, is_active=False, last_seen_at=t, created_at=t)
     c = Product(category_id=cat.id, subcategory_id=sub.id, current_name="C商品",
-                current_price=3000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                current_price=3000, is_active=True, last_seen_at=t, created_at=t)
     session.add_all([a, b, c])
     session.flush()
     session.add_all([

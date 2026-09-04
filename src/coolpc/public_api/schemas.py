@@ -61,7 +61,7 @@ class ProductDetail(BaseModel):
     previous_price: int | None
     change_amount: int | None
     change_percent: float | None
-    first_seen_at: datetime.datetime
+    created_at: datetime.datetime
     last_seen_at: datetime.datetime
     is_active: bool
     stats: ProductStatsOut

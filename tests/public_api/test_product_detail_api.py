@@ -38,7 +38,7 @@ def test_get_product_detail_includes_historical_names_and_stats():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 v2",
-                    current_price=19990, is_active=True, first_seen_at=t0, last_seen_at=t1, created_at=t0)
+                    current_price=19990, is_active=True, last_seen_at=t1, created_at=t0)
         session.add(p)
         session.flush()
         session.add_all([
@@ -77,7 +77,7 @@ def test_get_product_prices_returns_ordered_series():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="X",
-                    current_price=200, is_active=True, first_seen_at=t0, last_seen_at=t1, created_at=t0)
+                    current_price=200, is_active=True, last_seen_at=t1, created_at=t0)
         session.add(p)
         session.flush()
         session.add_all([
@@ -103,7 +103,7 @@ def test_get_product_stats_endpoint():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="X",
-                    current_price=500, is_active=True, first_seen_at=t0, last_seen_at=t0, created_at=t0)
+                    current_price=500, is_active=True, last_seen_at=t0, created_at=t0)
         session.add(p)
         session.flush()
         session.add(PriceHistory(product_id=p.id, price=500, status=None, badges="",
@@ -131,12 +131,12 @@ def test_get_product_prices_404_for_merged_away_source():
         session.add_all([cat, sub])
         session.flush()
         target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Target",
-                          current_price=200, is_active=True, first_seen_at=t0, last_seen_at=t1,
+                          current_price=200, is_active=True, last_seen_at=t1,
                           created_at=t0)
         session.add(target)
         session.flush()
         source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Source (merged)",
-                          current_price=999, is_active=False, first_seen_at=t0, last_seen_at=t0,
+                          current_price=999, is_active=False, last_seen_at=t0,
                           created_at=t0, merged_into_id=target.id)
         session.add(source)
         session.flush()
@@ -163,12 +163,12 @@ def test_get_product_stats_404_for_merged_away_source():
         session.add_all([cat, sub])
         session.flush()
         target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Target",
-                          current_price=200, is_active=True, first_seen_at=t0, last_seen_at=t1,
+                          current_price=200, is_active=True, last_seen_at=t1,
                           created_at=t0)
         session.add(target)
         session.flush()
         source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="Source (merged)",
-                          current_price=999, is_active=False, first_seen_at=t0, last_seen_at=t0,
+                          current_price=999, is_active=False, last_seen_at=t0,
                           created_at=t0, merged_into_id=target.id)
         session.add(source)
         session.flush()

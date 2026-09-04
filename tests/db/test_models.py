@@ -30,7 +30,7 @@ def test_create_full_chain():
             current_name="ASUS RTX 5070 PRIME 12G, $18990",
             brand="ASUS", model="RTX 5070 PRIME 12G",
             current_status=None, current_price=18990,
-            is_active=True, first_seen_at=now, last_seen_at=now,
+            is_active=True, last_seen_at=now,
             created_at=now,
         )
         session.add(product)
@@ -56,10 +56,10 @@ def test_merge_log_and_similarity_hint_tables_exist():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="A",
-                      current_price=100, is_active=True, first_seen_at=now,
+                      current_price=100, is_active=True,
                       last_seen_at=now, created_at=now)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="B",
-                      current_price=200, is_active=True, first_seen_at=now,
+                      current_price=200, is_active=True,
                       last_seen_at=now, created_at=now)
         session.add_all([p1, p2])
         session.flush()

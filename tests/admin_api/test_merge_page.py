@@ -38,9 +38,9 @@ def _seed_two_products(Session_):
         session.add_all([cat, sub])
         session.flush()
         source = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
-                         current_price=18990, is_active=False, first_seen_at=t, last_seen_at=t, created_at=t)
+                         current_price=18990, is_active=False, last_seen_at=t, created_at=t)
         target = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME OC 12GB",
-                         current_price=19990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                         current_price=19990, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([source, target])
         session.flush()
         session.add_all([
@@ -76,9 +76,9 @@ def test_product_search_page_uses_and_semantics_for_space_separated_query():
         session.add_all([cat, sub])
         session.flush()
         p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
-                     current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=18990, is_active=True, last_seen_at=t, created_at=t)
         p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="MSI RTX 5080 GAMING 16G",
-                     current_price=28990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                     current_price=28990, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([p1, p2])
         session.flush()
         session.add_all([
@@ -205,7 +205,7 @@ def test_product_search_json_returns_matches_by_name():
         session.add_all([cat, sub])
         session.flush()
         p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 搜尋測試",
-                   current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                   current_price=18990, is_active=True, last_seen_at=t, created_at=t)
         session.add(p)
         session.flush()
         session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -242,7 +242,7 @@ def test_product_search_json_and_match_finds_exact_product_among_many_newer():
         target = Product(category_id=cat.id, subcategory_id=sub.id,
                           current_name="ASUS RTX 5070 PRIME OC 12GB 特仕版",
                           current_price=19990, is_active=True,
-                          first_seen_at=t, last_seen_at=t, created_at=t)
+                          last_seen_at=t, created_at=t)
         session.add(target)
         session.flush()
         session.add(ProductName(product_id=target.id, name=target.current_name,
@@ -252,7 +252,7 @@ def test_product_search_json_and_match_finds_exact_product_among_many_newer():
             other = Product(category_id=cat.id, subcategory_id=sub.id,
                              current_name=f"其他商品 RTX {i}",
                              current_price=1000 + i, is_active=True,
-                             first_seen_at=newer, last_seen_at=newer, created_at=newer)
+                             last_seen_at=newer, created_at=newer)
             session.add(other)
             session.flush()
             session.add(ProductName(product_id=other.id, name=other.current_name,
@@ -280,7 +280,7 @@ def test_product_search_json_does_not_cap_results_at_ten():
             p = Product(category_id=cat.id, subcategory_id=sub.id,
                         current_name=f"ZOTAC RTX3050 型號{i}",
                         current_price=6000 + i, is_active=True,
-                        first_seen_at=t, last_seen_at=t, created_at=t)
+                        last_seen_at=t, created_at=t)
             session.add(p)
             session.flush()
             session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
@@ -302,9 +302,9 @@ def test_product_search_json_never_falls_back_to_or():
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
-                    current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=18990, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="MSI RTX 5080 GAMING 16G",
-                    current_price=28990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=28990, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         session.add_all([
@@ -330,9 +330,9 @@ def test_product_search_json_finds_non_contiguous_tokens_but_excludes_wrong_mode
         session.add_all([cat, sub])
         session.flush()
         a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ZOTAC RTX3050 ECO SOLO",
-                    current_price=6490, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=6490, is_active=True, last_seen_at=t, created_at=t)
         b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ZOTAC GT730 2GB Zone Edition",
-                    current_price=2490, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+                    current_price=2490, is_active=True, last_seen_at=t, created_at=t)
         session.add_all([a, b])
         session.flush()
         session.add_all([

@@ -50,7 +50,6 @@ class Product(Base):
     current_status: Mapped[str | None] = mapped_column(default=None)
     current_price: Mapped[int]
     is_active: Mapped[bool] = mapped_column(default=True)
-    first_seen_at: Mapped[datetime.datetime]
     last_seen_at: Mapped[datetime.datetime]
     merged_into_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), default=None)
     created_at: Mapped[datetime.datetime]

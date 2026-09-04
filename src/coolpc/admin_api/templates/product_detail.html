@@ -25,7 +25,6 @@
     <dt>原始狀態</dt><dd>{{ product.current_status or "-" }}</dd>
     <dt>目前價格</dt><dd>${{ "{:,}".format(product.current_price) }}</dd>
     <dt>是否在售</dt><dd>{{ "在售" if product.is_active else "已下架" }}</dd>
-    <dt>第一次出現</dt><dd>{{ product.first_seen_at.strftime("%Y-%m-%d %H:%M") }}</dd>
     <dt>最後一次出現</dt><dd>{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</dd>
     <dt>建立時間</dt><dd>{{ product.created_at.strftime("%Y-%m-%d %H:%M") }}</dd>
   </dl>
