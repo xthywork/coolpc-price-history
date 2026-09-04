@@ -147,8 +147,29 @@ def test_search_page_pagination_shows_numbered_page_links_and_jump_control():
     assert resp.status_code == 200
     assert "page=3" in resp.text
     assert "page=5" in resp.text
-    assert 'id="jumpPageBtn"' in resp.text
+    assert 'id="jumpPageInput"' in resp.text
     assert 'max="5"' in resp.text
+
+
+def test_search_page_pagination_is_centered_no_go_button_page_size_beside_total_pages():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # 頁碼控制列要置中
+    assert "justify-content:center" in resp.text
+    # 「前往」按鈕已刪除，改成 Enter 直接跳頁
+    assert 'id="jumpPageBtn"' not in resp.text
+    assert ">前往<" not in resp.text
+    assert "e.key !== 'Enter'" in resp.text
+    # 跳頁輸入框數字置中
+    assert "#jumpPageInput { text-align: center; }" in resp.text
+    # 每頁筆數下拉選單要在「共 N 頁」文字右側，且不在最上面的篩選表單裡
+    # （用 form="searchFiltersForm" 關聯回原本的表單，本身不在 <form> 標籤內）
+    total_pages_pos = resp.text.find("共 1 頁")
+    page_size_pos = resp.text.find('id="pageSizeSelect"')
+    assert total_pages_pos != -1 and page_size_pos != -1
+    assert total_pages_pos < page_size_pos
+    assert 'form="searchFiltersForm"' in resp.text
 
 
 def test_search_page_subcategory_select_and_filter():
@@ -326,11 +347,16 @@ def test_search_page_price_inputs_moved_last_to_own_row_with_auto_submit():
     assert pos_button != -1
     assert pos_button < pos_min_price
     # 價格欄位變動要用 /api/products 局部重繪表格（不是 ?q= 整頁導頁式更新，
-    # 也不是呼叫 form.submit() 整頁 reload）
+    # 也不是呼叫 form.submit() 整頁 reload）——只確認「價格 debounce」那段函式
+    # 本身沒有呼叫 submit()，頁面上其他控制項（例如每頁筆數下拉選單）另外
+    # 用真正的整頁 reload 是合理、預期中的行為，不受這裡限制。
     assert "minPriceInput" in resp.text and "addEventListener" in resp.text
     assert "/api/products?" in resp.text
     assert "resultCount" in resp.text
-    assert ".submit()" not in resp.text
+    autoupdate_start = resp.text.find("function autoUpdatePriceFilter")
+    autoupdate_end = resp.text.find("})();", autoupdate_start)
+    assert autoupdate_start != -1 and autoupdate_end != -1
+    assert ".submit()" not in resp.text[autoupdate_start:autoupdate_end]
 
 
 def test_base_layout_has_compare_clear_control():

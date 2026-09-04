@@ -28,12 +28,6 @@
       <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
       <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
     </select>
-    <select name="page_size" id="pageSizeSelect">
-      {% for opt in page_size_options %}
-      <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
-      {% endfor %}
-      <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
-    </select>
     <button type="submit" style="margin-left:auto;">搜尋</button>
   </div>
   <div style="display:flex; gap:8px; margin-top:8px;">
@@ -58,6 +52,7 @@
   .pagination a:hover { background: #f1f5f9; }
   .pagination .pageCurrent { background: #4f46e5; color: #fff; font-weight: 700; }
   .pagination .pageEllipsis { color: #9ca3af; border: none; min-width: auto; }
+  #jumpPageInput { text-align: center; }
 </style>
 
 <table id="resultsTable">
@@ -79,24 +74,36 @@
   </tbody>
 </table>
 
-<div class="pagination" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
-  {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}">上一頁</a>{% endif %}
-  {% for p in page_list %}
-    {% if p is none %}
-    <span class="pageEllipsis">…</span>
-    {% elif p == page %}
-    <span class="pageCurrent">{{ p }}</span>
-    {% else %}
-    <a href="/?{{ query_string }}&page={{ p }}">{{ p }}</a>
-    {% endif %}
-  {% endfor %}
-  {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}">下一頁</a>{% endif %}
-  <span style="margin-left:12px; display:inline-flex; align-items:center; gap:4px;">
-    跳至第
-    <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}" style="width:60px;">
-    頁（共 {{ total_pages }} 頁）
-    <button type="button" id="jumpPageBtn">前往</button>
-  </span>
+<div class="pagination">
+  <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px;">
+    {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}">上一頁</a>{% endif %}
+    {% for p in page_list %}
+      {% if p is none %}
+      <span class="pageEllipsis">…</span>
+      {% elif p == page %}
+      <span class="pageCurrent">{{ p }}</span>
+      {% else %}
+      <a href="/?{{ query_string }}&page={{ p }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}">下一頁</a>{% endif %}
+  </div>
+  <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; margin-top:8px;">
+    <span>
+      跳至第
+      <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}" style="width:60px;">
+      頁
+    </span>
+    <span>
+      共 {{ total_pages }} 頁
+      <select name="page_size" id="pageSizeSelect" form="searchFiltersForm">
+        {% for opt in page_size_options %}
+        <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
+        {% endfor %}
+        <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
+      </select>
+    </span>
+  </div>
 </div>
 
 <script>
@@ -114,18 +121,23 @@ function wireCompareCheckbox(cb) {
 }
 document.querySelectorAll('.compareCheckbox').forEach(wireCompareCheckbox);
 
-const jumpPageBtn = document.getElementById('jumpPageBtn');
-if (jumpPageBtn) {
-  jumpPageBtn.addEventListener('click', () => {
-    const input = document.getElementById('jumpPageInput');
-    const target = parseInt(input.value, 10);
+const jumpPageInput = document.getElementById('jumpPageInput');
+if (jumpPageInput) {
+  jumpPageInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const target = parseInt(jumpPageInput.value, 10);
     if (!target || target < 1) return;
     const params = new URLSearchParams('{{ query_string }}');
     params.set('page', target);
     window.location.href = '/?' + params.toString();
   });
-  document.getElementById('jumpPageInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); jumpPageBtn.click(); }
+}
+
+const pageSizeSelect = document.getElementById('pageSizeSelect');
+if (pageSizeSelect) {
+  pageSizeSelect.addEventListener('change', () => {
+    document.getElementById('searchFiltersForm').submit();
   });
 }
 
