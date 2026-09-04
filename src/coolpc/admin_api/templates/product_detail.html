@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}#{{ product.id }} {{ product.current_name }} - 原價屋管理介面{% endblock %}
+{% block content %}
+<h1>商品詳細資料 #{{ product.id }}</h1>
+{% if message %}<p style="color:#15803d">{{ message }}</p>{% endif %}
+{% if merged_into %}
+<p style="color:#b91c1c">此商品已合併至 <a href="/products/{{ merged_into.id }}">#{{ merged_into.id }} {{ merged_into.current_name }}</a>，不可編輯。</p>
+{% endif %}
+
+<style>
+  dl.detailList { display: grid; grid-template-columns: 140px 1fr; gap: 8px 16px; background: #fff; padding: 16px; border-radius: 6px; }
+  dl.detailList dt { color: #6b7280; font-size: 13px; }
+  dl.detailList dd { margin: 0; }
+  #editForm label { display: block; margin-bottom: 10px; font-size: 13px; color: #374151; }
+  #editForm input, #editForm select { display: block; width: 100%; max-width: 360px; padding: 6px; margin-top: 4px; }
+</style>
+
+<div id="viewSection">
+  <dl class="detailList">
+    <dt>ID</dt><dd>{{ product.id }}</dd>
+    <dt>分類</dt><dd>{{ category.label }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}</dd>
+    <dt>商品名稱</dt><dd>{{ product.current_name }}</dd>
+    <dt>品牌</dt><dd>{{ product.brand or "-" }}</dd>
+    <dt>型號</dt><dd>{{ product.model or "-" }}</dd>
+    <dt>原始狀態</dt><dd>{{ product.current_status or "-" }}</dd>
+    <dt>目前價格</dt><dd>${{ "{:,}".format(product.current_price) }}</dd>
+    <dt>上次價格異動</dt>
+    <dd>{% if product.last_change_amount is not none %}{{ "%+d"|format(product.last_change_amount) }} ({{ "%.1f"|format(product.last_change_percent) }}%){% else %}-{% endif %}</dd>
+    <dt>是否在售</dt><dd>{{ "在售" if product.is_active else "已下架" }}</dd>
+    <dt>第一次出現</dt><dd>{{ product.first_seen_at.strftime("%Y-%m-%d %H:%M") }}</dd>
+    <dt>最後一次出現</dt><dd>{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</dd>
+    <dt>建立時間</dt><dd>{{ product.created_at.strftime("%Y-%m-%d %H:%M") }}</dd>
+  </dl>
+  {% if not merged_into %}
+  <p><button type="button" id="editBtn">編輯</button></p>
+  {% endif %}
+</div>
+
+{% if not merged_into %}
+<div id="editSection" hidden>
+  <form method="post" action="/products/{{ product.id }}" id="editForm">
+    <label>商品名稱
+      <input type="text" name="current_name" value="{{ product.current_name }}" required>
+    </label>
+    <label>分類
+      <select name="category_id" id="categorySelect">
+        {% for c in categories %}
+        <option value="{{ c.id }}" {% if c.id == product.category_id %}selected{% endif %}>{{ c.label }}</option>
+        {% endfor %}
+        <option value="__new__">+ 新增類別</option>
+      </select>
+    </label>
+    <label>子分類
+      <select name="subcategory_id" id="subcategorySelect"></select>
+    </label>
+    <label>品牌
+      <input type="text" name="brand" value="{{ product.brand or '' }}">
+    </label>
+    <label>型號
+      <input type="text" name="model" value="{{ product.model or '' }}">
+    </label>
+    <label>原始狀態
+      <input type="text" name="current_status" value="{{ product.current_status or '' }}">
+    </label>
+    <label>目前價格
+      <input type="number" name="current_price" value="{{ product.current_price }}" required>
+    </label>
+    <label>是否在售
+      <select name="is_active">
+        <option value="true" {% if product.is_active %}selected{% endif %}>在售</option>
+        <option value="false" {% if not product.is_active %}selected{% endif %}>已下架</option>
+      </select>
+    </label>
+    <p>
+      <button type="submit">儲存</button>
+      <button type="button" id="cancelEditBtn">取消</button>
+    </p>
+  </form>
+</div>
+{% endif %}
+
+<script>
+const SUBCATEGORIES = {{ subcategories_json | safe }};
+const CURRENT_CATEGORY_ID = {{ product.category_id }};
+const CURRENT_SUBCATEGORY_ID = {{ product.subcategory_id }};
+let prevCategoryId = CURRENT_CATEGORY_ID;
+
+const categorySelect = document.getElementById('categorySelect');
+const subcategorySelect = document.getElementById('subcategorySelect');
+
+function rebuildSubcategoryOptions(categoryId, selectedId) {
+  subcategorySelect.innerHTML = '';
+  SUBCATEGORIES.filter((s) => s.category_id === categoryId).forEach((s) => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.label || '(無子分類名稱)';
+    if (s.id === selectedId) opt.selected = true;
+    subcategorySelect.appendChild(opt);
+  });
+}
+
+if (categorySelect) {
+  rebuildSubcategoryOptions(CURRENT_CATEGORY_ID, CURRENT_SUBCATEGORY_ID);
+
+  categorySelect.addEventListener('change', () => {
+    if (categorySelect.value === '__new__') {
+      const name = prompt('請輸入新分類名稱：');
+      if (!name || !name.trim()) {
+        categorySelect.value = String(prevCategoryId);
+        return;
+      }
+      fetch('/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'name=' + encodeURIComponent(name.trim()),
+      })
+        .then(async (resp) => {
+          if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || '新增分類失敗');
+          }
+          return resp.json();
+        })
+        .then((data) => {
+          const opt = document.createElement('option');
+          opt.value = data.category_id;
+          opt.textContent = data.category_label;
+          categorySelect.insertBefore(opt, categorySelect.querySelector('option[value="__new__"]'));
+          categorySelect.value = data.category_id;
+          SUBCATEGORIES.push({ id: data.subcategory_id, category_id: data.category_id, label: data.subcategory_label });
+          rebuildSubcategoryOptions(data.category_id, data.subcategory_id);
+          prevCategoryId = data.category_id;
+        })
+        .catch((err) => {
+          alert(err.message);
+          categorySelect.value = String(prevCategoryId);
+        });
+      return;
+    }
+    prevCategoryId = parseInt(categorySelect.value, 10);
+    rebuildSubcategoryOptions(prevCategoryId, null);
+  });
+}
+
+const editBtn = document.getElementById('editBtn');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+const viewSection = document.getElementById('viewSection');
+const editSection = document.getElementById('editSection');
+
+if (editBtn) {
+  editBtn.addEventListener('click', () => {
+    viewSection.hidden = true;
+    editSection.hidden = false;
+  });
+}
+if (cancelEditBtn) {
+  cancelEditBtn.addEventListener('click', () => {
+    editSection.hidden = true;
+    viewSection.hidden = false;
+  });
+}
+</script>
+{% endblock %}

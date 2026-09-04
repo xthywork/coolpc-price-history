@@ -58,11 +58,13 @@ def test_product_search_page_shows_id_and_name():
     assert resp.status_code == 200
     assert str(source_id) in resp.text
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
-    # 商品名稱欄要佔表格一半以上寬度，不能被壓縮
-    assert "width:55%" in resp.text
+    # 商品名稱欄要佔表格最大比例，不能被壓縮
+    assert "width:34%" in resp.text
     # 欄寬仍要能手動拖曳調整
     assert "col-resizer" in resp.text
     assert "mousedown" in resp.text
+    # 商品名稱連結到該商品的詳細/編輯頁
+    assert f'href="/products/{source_id}"' in resp.text
 
 
 def test_product_search_page_uses_and_semantics_for_space_separated_query():

@@ -2,38 +2,101 @@
 {% block title %}商品搜尋 - 原價屋管理介面{% endblock %}
 {% block content %}
 <h1>商品搜尋</h1>
-<form method="get" action="/products">
-  <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱" value="{{ query.q }}">
-  <select name="category_id">
-    <option value="">全部分類</option>
-    {% for c in categories %}
-    <option value="{{ c.id }}" {% if query.category_id == c.id %}selected{% endif %}>{{ c.label }}</option>
-    {% endfor %}
-  </select>
-  <button type="submit">搜尋</button>
+<form method="get" action="/products" id="productsFiltersForm" style="display:block;">
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱" value="{{ query.q }}" style="flex:1; min-width:200px;">
+    <button type="submit">搜尋</button>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+    <select name="category_id">
+      <option value="">全部分類</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {% if query.category_id == c.id %}selected{% endif %}>{{ c.label }}</option>
+      {% endfor %}
+    </select>
+    <select name="is_active">
+      <option value="">在售/下架</option>
+      <option value="true" {% if query.is_active == True %}selected{% endif %}>僅在售</option>
+      <option value="false" {% if query.is_active == False %}selected{% endif %}>僅下架</option>
+    </select>
+  </div>
 </form>
-<p>共 {{ total }} 筆（僅顯示前 100 筆）</p>
+
+<p>共 {{ total }} 筆結果</p>
+
 <style>
   #adminProductsTable { table-layout: fixed; }
   #adminProductsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   #adminProductsTable th .col-resizer {
     position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
   }
+  .pagination { margin-top: 16px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 16px; }
+  .pagination a, .pagination .pageCurrent, .pagination .pageEllipsis {
+    display: inline-block; min-width: 28px; text-align: center; padding: 4px 6px;
+    border-radius: 4px; font-size: 14px;
+  }
+  .pagination a { text-decoration: none; border: 1px solid #d1d5db; }
+  .pagination a:hover { background: #f1f5f9; }
+  .pagination .pageCurrent { background: #4f46e5; color: #fff; font-weight: 700; }
+  .pagination .pageEllipsis { color: #9ca3af; border: none; min-width: auto; }
+  #jumpPageInput { text-align: center; }
 </style>
+
 <table id="adminProductsTable">
-  <thead><tr><th style="width:6%">ID</th><th style="width:55%">商品名稱</th><th style="width:13%">現價</th><th style="width:10%">狀態</th><th style="width:16%">最後更新</th></tr></thead>
+  <thead>
+    <tr>
+      <th style="width:6%">ID</th><th style="width:34%">商品名稱</th><th style="width:12%">品牌</th>
+      <th style="width:14%">型號</th><th style="width:12%">目前價格</th><th style="width:10%">是否在售</th>
+      <th style="width:12%">建立時間</th>
+    </tr>
+  </thead>
   <tbody>
     {% for p in products %}
     <tr>
       <td>{{ p.id }}</td>
-      <td>{{ p.current_name }}</td>
+      <td><a href="/products/{{ p.id }}">{{ p.current_name }}</a></td>
+      <td>{{ p.brand or "" }}</td>
+      <td>{{ p.model or "" }}</td>
       <td>${{ "{:,}".format(p.current_price) }}</td>
       <td>{{ "在售" if p.is_active else "已下架" }}</td>
-      <td>{{ p.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td>{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<div class="pagination">
+  <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px;">
+    {% if page > 1 %}<a href="/products?{{ query_string }}&page={{ page - 1 }}">上一頁</a>{% endif %}
+    {% for p in page_list %}
+      {% if p is none %}
+      <span class="pageEllipsis">…</span>
+      {% elif p == page %}
+      <span class="pageCurrent">{{ p }}</span>
+      {% else %}
+      <a href="/products?{{ query_string }}&page={{ p }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}<a href="/products?{{ query_string }}&page={{ page + 1 }}">下一頁</a>{% endif %}
+  </div>
+  <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px;">
+    <span>
+      跳至第
+      <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}" style="width:60px;">
+      頁
+    </span>
+    <span>
+      共 {{ total_pages }} 頁
+      <select name="page_size" id="pageSizeSelect" form="productsFiltersForm">
+        {% for opt in page_size_options %}
+        <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
+        {% endfor %}
+        <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
+      </select>
+    </span>
+  </div>
+</div>
+
 <p>複製要合併的商品 ID，到 <a href="/merge">合併商品</a> 頁面操作。</p>
 
 <script>
@@ -60,5 +123,38 @@ function makeColumnsResizable(table) {
 }
 const adminProductsTable = document.getElementById('adminProductsTable');
 if (adminProductsTable) makeColumnsResizable(adminProductsTable);
+
+const jumpPageInput = document.getElementById('jumpPageInput');
+if (jumpPageInput) {
+  jumpPageInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const target = parseInt(jumpPageInput.value, 10);
+    if (!target || target < 1) return;
+    const params = new URLSearchParams('{{ query_string }}');
+    params.set('page', target);
+    window.location.href = '/products?' + params.toString();
+  });
+}
+
+const pageSizeSelect = document.getElementById('pageSizeSelect');
+if (pageSizeSelect) {
+  pageSizeSelect.addEventListener('change', () => {
+    try { sessionStorage.setItem('coolpc_admin_products_scroll', String(window.scrollY)); } catch (e) {}
+    document.getElementById('productsFiltersForm').submit();
+  });
+}
+
+// 還原捲動位置的程式必須放在表格/分頁的 HTML 都解析完之後才執行，這樣頁面
+// 才有足夠高度可以捲過去。
+(function () {
+  try {
+    const savedScroll = sessionStorage.getItem('coolpc_admin_products_scroll');
+    if (savedScroll !== null) {
+      sessionStorage.removeItem('coolpc_admin_products_scroll');
+      window.scrollTo(0, parseInt(savedScroll, 10));
+    }
+  } catch (e) {}
+})();
 </script>
 {% endblock %}
