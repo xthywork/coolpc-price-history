@@ -33,13 +33,9 @@ def product_search(
 def product_search_json(q: str = "", session: Session = Depends(get_session)):
     if not q.strip():
         return []
-    # 先試 AND 語意（要求所有 token 都命中），在真實資料量下才能精確命中查詢的
-    # 那個商品本身；只有在 AND 完全查無結果（查詢字串太模糊/太籠統）時，才退回
-    # search_products() 的 OR 語意當作較寬鬆的後備，避免完全查不到東西。
+    # AND 語意：要求所有空白分隔的片段都命中，才能精確命中查詢的那個商品
+    # 本身，完全不退回 OR 後備——寧可查無結果，也不要讓不精確的商品混進來。
     products = search_products_and(session, q, limit=10)
-    if not products:
-        filters = SearchFilters(q=q, limit=10)
-        products, _total = search_products(session, filters)
     return [
         {"id": p.id, "name": p.current_name, "price": p.current_price, "is_active": p.is_active}
         for p in products

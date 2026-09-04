@@ -165,15 +165,17 @@ def test_search_by_keyword_with_space_matches_literal_space_in_name():
     _add(session, cat, sub, "Synology HAT3300 4TB【限搭NAS主機】", 6890, True, t)
     session.commit()
 
-    # 名稱本身就含空白，"RTX 5070" 整段仍要能比對到；另一個商品的名稱完全
-    # 不含 "RTX"、"5070" 這兩個 token（也不含 "RTX 5070" 整段），確保這裡
-    # 驗證的是「整段比對」本身有效，不會被下面測試的 OR token 語意混淆。
+    # 名稱本身就含空白，"RTX 5070" 拆成 "RTX"/"5070" 兩個 token（預設 AND
+    # 語意）仍要能各自比對到、進而找到這個商品；另一個商品完全不含這兩個
+    # token，確保不會被誤配到。
     results, total = search_products(session, SearchFilters(q="RTX 5070"))
     assert total == 1
     assert "5070" in results[0].current_name
 
 
-def test_search_by_keyword_with_space_also_means_or():
+def test_search_by_keyword_with_space_means_or_only_when_explicitly_requested():
+    """空白分隔預設是 AND；只有明確傳入 q_match="or" 才會退回 OR 語意
+    （較寬鬆的瀏覽/篩選情境，非預設）。"""
     session = _session()
     cat = Category(name="顯示卡VGA")
     sub = Subcategory(name="NVIDIA", category=cat)
@@ -185,32 +187,59 @@ def test_search_by_keyword_with_space_also_means_or():
     _add(session, cat, sub, "Synology DS923+", 15990, True, t)
     session.commit()
 
-    # "RTX 5090" 不是任何商品的完整子字串，但拆成 "RTX" / "5090" 後
-    # "RTX" 應該用 OR 語意比對到兩張顯卡（5090 本身查無結果不影響 OR）
-    results, total = search_products(session, SearchFilters(q="RTX 5090"))
-    names = {p.current_name for p in results}
-    assert total == 2
+    # 預設 AND 語意：沒有任何商品同時包含 "RTX" 又包含 "5090"，查不到
+    default_results, default_total = search_products(session, SearchFilters(q="RTX 5090"))
+    assert default_total == 0
+    assert default_results == []
+
+    # 明確要求 OR 語意時，"RTX" 這個 token 應該比對到兩張顯卡
+    or_results, or_total = search_products(session, SearchFilters(q="RTX 5090", q_match="or"))
+    names = {p.current_name for p in or_results}
+    assert or_total == 2
     assert "ASUS RTX 5070 PRIME 12G" in names
     assert "MSI RTX 5080 GAMING 16G" in names
     assert "Synology DS923+" not in names
 
 
-def test_search_products_and_requires_all_tokens_across_names():
-    """AND 語意：所有 token（含整段字串）都要在該商品的某個歷史名稱比對到，
-    tokens 不必落在同一個 ProductName 列上（可跨目前名稱與歷史名稱）。"""
+def test_search_default_and_finds_non_contiguous_tokens_but_excludes_wrong_model():
+    """搜尋「ZOTAC 3050」要能找到「ZOTAC RTX3050 ECO SOLO」（3050 沒有以
+    獨立單字出現，是夾在 RTX3050 裡面），但不能找到「ZOTAC GT730 2GB Zone
+    Edition」（完全沒有 3050）——驗證預設 AND 語意不要求整段字串連續出現，
+    只要求每個片段各自命中。"""
     session = _session()
     cat = Category(name="顯示卡VGA")
     sub = Subcategory(name="NVIDIA", category=cat)
     session.add_all([cat, sub])
     session.flush()
     t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "ZOTAC RTX3050 ECO SOLO", 6490, True, t)
+    _add(session, cat, sub, "ZOTAC GT730 2GB Zone Edition", 2490, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(q="ZOTAC 3050"))
+    assert total == 1
+    assert results[0].current_name == "ZOTAC RTX3050 ECO SOLO"
+
+
+def test_search_products_and_requires_all_tokens_across_names():
+    """AND 語意：每個 token 都要在該商品的某個歷史名稱比對到，但不必是
+    同一列——同一商品底下，目前名稱跟歷史（改名前）名稱都算數。這裡刻意
+    讓其中一個 token 只出現在改名前的歷史名稱、不出現在目前名稱，證明
+    AND 是跨列彙整判斷，不是只看目前名稱。"""
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    # 目前名稱是 5070，改名前的舊名稱是 5060——"5060" 這個 token 只存在
+    # 於歷史名稱列，不存在於目前名稱列。
     target = _add(session, cat, sub, "ASUS RTX 5070 PRIME OC 12GB", 19990, True, t)
-    # 整段字串比對落在另一個歷史名稱列上，證明不必和 token 比對同一列。
-    session.add(ProductName(product_id=target.id, name="ASUS RTX 5070 PRIME 12G", first_seen_at=t, last_seen_at=t))
+    session.add(ProductName(product_id=target.id, name="ASUS RTX 5060 PRIME OC 12GB", first_seen_at=t, last_seen_at=t))
     _add(session, cat, sub, "MSI RTX 5080 GAMING 16G", 28990, True, t)
     session.commit()
 
-    results = search_products_and(session, "ASUS RTX 5070 PRIME 12G")
+    results = search_products_and(session, "ASUS 5060")
     assert len(results) == 1
     assert results[0].id == target.id
 
@@ -295,8 +324,8 @@ def test_search_products_q_match_and_requires_both_words():
     _add(session, cat, sub, "Synology DS923+", 15990, True, t)
     session.commit()
 
-    # 用預設 OR 語意查，"RTX 5090" 應該因為 "RTX" 這個 token 命中兩張顯卡
-    or_results, or_total = search_products(session, SearchFilters(q="RTX 5090"))
+    # 明確用 OR 語意查，"RTX 5090" 應該因為 "RTX" 這個 token 命中兩張顯卡
+    or_results, or_total = search_products(session, SearchFilters(q="RTX 5090", q_match="or"))
     assert or_total == 2
 
     # 改用 AND 語意查同樣的字串，因為沒有任何商品同時包含 "RTX" 又包含

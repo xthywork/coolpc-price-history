@@ -8,7 +8,7 @@ from coolpc.db.models import Category, Product, ProductName
 @dataclass
 class SearchFilters:
     q: str | None = None
-    q_match: str = "or"  # "or" | "and" — 空白分隔的每個片段用 OR 還是 AND 語意比對
+    q_match: str = "and"  # "or" | "and" — 空白分隔的每個片段用 OR 還是 AND 語意比對
     category_id: int | None = None
     subcategory_id: int | None = None
     brand: str | None = None
@@ -53,15 +53,19 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
 
     if filters.q:
-        # 空白分隔的每個片段，同時保留整段字串本身的比對
-        # （名稱本來就含空白時，例如「RTX 5070」，仍要能整段比對到）。
         tokens = filters.q.split()
-        patterns = {filters.q, *tokens}
         if filters.q_match == "and":
-            # 每個片段都必須同時命中，用於需要精確鎖定單一商品的場景
-            # （例如後台商品搜尋、商品比較的名稱自動完成）。
-            query = _require_all_patterns(query, session, patterns)
+            # 每個空白分隔的片段都必須各自命中（不要求整段字串本身連續出現）
+            # ——例如搜尋「ZOTAC 3050」要能找到「ZOTAC RTX3050 ECO SOLO」，
+            # 即使商品名稱裡並沒有「ZOTAC 3050」這個連續子字串；但同時
+            # 「ZOTAC GT730 2GB Zone Edition」因為完全不含「3050」，仍會被
+            # 正確排除。這是預設語意，用於所有商品名稱搜尋（含公開搜尋頁）。
+            query = _require_all_patterns(query, session, set(tokens))
         else:
+            # OR 語意：任一片段命中即算符合，同時保留整段字串本身的比對
+            # （名稱本來就含空白時，例如「RTX 5070」，仍要能整段比對到）。
+            # 僅在明確要求較寬鬆的瀏覽/篩選情境下使用（非預設）。
+            patterns = {filters.q, *tokens}
             matched_ids = [
                 row[0] for row in
                 session.query(ProductName.product_id)
@@ -111,17 +115,17 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
 
 
 def search_products_and(session: Session, q: str, limit: int = 10) -> list[Product]:
-    """AND 語意搜尋：每個空白分隔的 token（以及整段字串本身）都必須各自在該商品的
-    某個歷史名稱（ProductName）上比對到才算符合——不必是同一列，同一商品底下的
-    不同名稱列都算數。用於管理後台合併頁的名稱自動完成：比對範圍精確，
-    不像 search_products() 的 OR 語意會在大量真實資料下讓真正符合的商品被
-    LIMIT 擠出結果（那個 OR 語意本身是刻意保留、給公開搜尋頁用的，這裡不動它）。
+    """AND 語意搜尋：每個空白分隔的 token 都必須各自在該商品的某個歷史名稱
+    （ProductName）上比對到才算符合——不必是同一列，同一商品底下的不同
+    名稱列都算數；也不要求整段字串本身連續出現（見 search_products()
+    q_match="and" 分支的說明）。用於名稱自動完成（例如管理後台合併頁、
+    商品比較頁的加入搜尋）：比對範圍精確，不像單純 OR 語意會在大量真實
+    資料下讓真正符合的商品被籠統結果和 LIMIT 擠出去。
     """
     if not q or not q.strip():
         return []
     tokens = q.split()
-    patterns = {q, *tokens}
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
-    query = _require_all_patterns(query, session, patterns)
+    query = _require_all_patterns(query, session, set(tokens))
     query = query.order_by(Product.last_seen_at.desc()).limit(limit)
     return query.all()

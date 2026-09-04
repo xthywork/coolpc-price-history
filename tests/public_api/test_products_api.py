@@ -158,9 +158,9 @@ def test_autocomplete_uses_and_semantics_not_or():
     _seed_product(Session_, "ASUS RTX 5070 PRIME 12G", 18990)
     _seed_product(Session_, "MSI RTX 5080 GAMING 16G", 28990)
 
-    # OR 語意的 /api/products：兩個商品都含 "RTX"，OR 語意下 "RTX 5070"
-    # 兩張顯卡都會命中（"RTX" 這個 token 兩者都有）。
-    or_resp = client.get("/api/products", params={"q": "RTX 5070"})
+    # 明確要求 OR 語意的 /api/products：兩個商品都含 "RTX"，OR 語意下
+    # "RTX 5070" 兩張顯卡都會命中（"RTX" 這個 token 兩者都有）。
+    or_resp = client.get("/api/products", params={"q": "RTX 5070", "q_match": "or"})
     assert or_resp.json()["total"] == 2
 
     # 同樣的查詢字串，AND 語意的自動完成端點必須只精準命中真正同時包含
@@ -173,16 +173,16 @@ def test_autocomplete_uses_and_semantics_not_or():
     assert and_resp.json()["items"][0]["current_name"] == "ASUS RTX 5070 PRIME 12G"
 
 
-def test_autocomplete_falls_back_to_or_when_and_finds_nothing():
+def test_autocomplete_never_falls_back_to_or():
     client, Session_ = _make_client()
     _seed_product(Session_, "Synology HAT3300 4TB NAS專用碟", 6890)
 
-    # AND 語意對 "限搭 4TB" 這種查詢字串在真實資料上常常太嚴格找不到，
-    # 這裡故意用一個只有其中一個 token 會命中的查詢，驗證退回 OR 後備。
+    # AND 完全查無結果時（例如查詢分段各自命中不同商品或根本查無此字），
+    # 必須直接回傳空結果，不能退回 OR 語意撈出不精確的候選商品。
     resp = client.get("/api/products/autocomplete", params={"q": "4TB 不存在的字串"})
     assert resp.status_code == 200
-    assert resp.json()["total"] == 1
-    assert resp.json()["items"][0]["current_name"] == "Synology HAT3300 4TB NAS專用碟"
+    assert resp.json()["total"] == 0
+    assert resp.json()["items"] == []
 
 
 def test_autocomplete_empty_query_returns_empty_list():

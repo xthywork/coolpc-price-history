@@ -264,9 +264,9 @@ def test_product_search_json_and_match_finds_exact_product_among_many_newer():
     assert target_id in ids
 
 
-def test_product_search_json_falls_back_to_or_when_and_match_is_empty():
-    """AND 比對查無結果時（例如查詢分段各自符合不同商品），應退回 OR 語意，
-    仍能靠單一 token 找到候選商品，而不是直接回傳空陣列。"""
+def test_product_search_json_never_falls_back_to_or():
+    """AND 比對查無結果時，必須直接回傳空陣列，不能退回 OR 語意撈出一堆不
+    精確的候選商品——寧可查無結果，也不要讓不精確的商品混進來。"""
     client, Session_ = _make_client()
     t = datetime.datetime(2026, 2, 1)
     with Session_() as session:
@@ -288,7 +288,36 @@ def test_product_search_json_falls_back_to_or_when_and_match_is_empty():
 
     resp = client.get("/products/search-json", params={"q": "RTX 5090"})
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert resp.json() == []
+
+
+def test_product_search_json_finds_non_contiguous_tokens_but_excludes_wrong_model():
+    """使用者提供的具體案例：搜尋 "ZOTAC 3050" 要找到 "ZOTAC RTX3050 ECO
+    SOLO"（3050 沒有以獨立單字出現，是夾在 RTX3050 裡面），但不能找到
+    "ZOTAC GT730 2GB Zone Edition"（完全沒有 3050）。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ZOTAC RTX3050 ECO SOLO",
+                    current_price=6490, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ZOTAC GT730 2GB Zone Edition",
+                    current_price=2490, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([a, b])
+        session.flush()
+        session.add_all([
+            ProductName(product_id=a.id, name=a.current_name, first_seen_at=t, last_seen_at=t),
+            ProductName(product_id=b.id, name=b.current_name, first_seen_at=t, last_seen_at=t),
+        ])
+        session.commit()
+
+    resp = client.get("/products/search-json", params={"q": "ZOTAC 3050"})
+    assert resp.status_code == 200
+    names = [row["name"] for row in resp.json()]
+    assert names == ["ZOTAC RTX3050 ECO SOLO"]
 
 
 def test_merge_page_shows_more_than_50_merge_logs():
