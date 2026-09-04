@@ -68,3 +68,20 @@ def test_merge_log_and_similarity_hint_tables_exist():
         session.commit()
         assert session.query(MergeLog).count() == 1
         assert session.query(SimilarityHint).count() == 1
+
+
+def test_category_and_subcategory_label_falls_back_to_name_when_no_display_name():
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    assert cat.label == "顯示卡VGA"
+    assert sub.label == "NVIDIA"
+
+
+def test_category_and_subcategory_label_prefers_display_name_when_set():
+    cat = Category(name="顯示卡VGA", display_name="顯卡")
+    sub = Subcategory(name="NVIDIA", display_name="輝達")
+    assert cat.label == "顯卡"
+    assert sub.label == "輝達"
+    # name 欄位（抓取比對用）本身完全不受 display_name 影響
+    assert cat.name == "顯示卡VGA"
+    assert sub.name == "NVIDIA"

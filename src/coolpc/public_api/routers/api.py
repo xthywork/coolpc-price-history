@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api")
 @router.get("/categories", response_model=list[schemas.CategoryOut])
 def list_categories(session: Session = Depends(get_session)):
     categories = session.query(Category).order_by(Category.id).all()
-    return [schemas.CategoryOut(id=c.id, name=c.name) for c in categories]
+    return [schemas.CategoryOut(id=c.id, name=c.label) for c in categories]
 
 
 def _to_list_item(session: Session, product: Product) -> schemas.ProductListItem:
@@ -24,7 +24,7 @@ def _to_list_item(session: Session, product: Product) -> schemas.ProductListItem
     stats = compute_product_stats(session, product.id)
     return schemas.ProductListItem(
         id=product.id, current_name=product.current_name,
-        category_name=category.name, subcategory_name=subcategory.name,
+        category_name=category.label, subcategory_name=subcategory.label,
         current_price=product.current_price, previous_price=stats.previous_price,
         change_amount=stats.change_amount, change_percent=stats.change_percent,
         low_30d=stats.low_30d, high_30d=stats.high_30d,
@@ -73,7 +73,7 @@ def get_product(product: Product = Depends(get_visible_product), session: Sessio
     ]
     return schemas.ProductDetail(
         id=product.id, current_name=product.current_name, historical_names=names,
-        category_name=category.name, subcategory_name=subcategory.name,
+        category_name=category.label, subcategory_name=subcategory.label,
         current_price=product.current_price, previous_price=stats.previous_price,
         change_amount=stats.change_amount, change_percent=stats.change_percent,
         first_seen_at=product.first_seen_at, last_seen_at=product.last_seen_at,

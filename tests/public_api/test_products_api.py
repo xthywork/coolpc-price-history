@@ -39,6 +39,19 @@ def test_list_categories_returns_seeded_categories():
     assert any(c["name"] == "顯示卡VGA" for c in resp.json())
 
 
+def test_list_categories_prefers_display_name_when_set():
+    client, Session_ = _make_client()
+    with Session_() as session:
+        session.add(Category(name="顯示卡VGA", display_name="顯卡"))
+        session.commit()
+
+    resp = client.get("/api/categories")
+    assert resp.status_code == 200
+    names = [c["name"] for c in resp.json()]
+    assert "顯卡" in names
+    assert "顯示卡VGA" not in names
+
+
 def _seed_product(Session_, name, price, category_name="顯示卡VGA", subcategory_name="NVIDIA"):
     t = datetime.datetime(2026, 2, 1)
     with Session_() as session:

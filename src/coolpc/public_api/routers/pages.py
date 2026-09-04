@@ -75,7 +75,7 @@ def search_page(
         .all()
     )
     subcategories = [
-        {"id": sc.id, "label": f"{cat.name} / {sc.name}"}
+        {"id": sc.id, "label": f"{cat.label} / {sc.label}"}
         for sc, cat in subcategory_rows
     ]
 

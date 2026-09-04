@@ -6,7 +6,7 @@
     <input type="checkbox" id="compareCheckbox"> 加入比較
   </label>
 </h1>
-<p>分類：{{ category.name }} / {{ subcategory.name }}　狀態：{{ "在售" if product.is_active else "已下架" }}</p>
+<p>分類：{{ category.label }} / {{ subcategory.label }}　狀態：{{ "在售" if product.is_active else "已下架" }}</p>
 <p>歷史名稱：{{ historical_names | join("、") }}</p>
 <p>第一次出現：{{ product.first_seen_at.strftime("%Y-%m-%d %H:%M") }}　最後一次出現：{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</p>
 

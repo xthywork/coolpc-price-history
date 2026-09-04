@@ -12,7 +12,14 @@ class Category(Base):
     __tablename__ = "categories"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
+    # 人工設定的顯示名稱，只影響畫面呈現；抓取比對永遠只認 name，不讀這個
+    # 欄位，見 migrations/versions/0004_category_display_names.py 的說明。
+    display_name: Mapped[str | None] = mapped_column(default=None)
     subcategories: Mapped[list["Subcategory"]] = relationship(back_populates="category")
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.name
 
 
 class Subcategory(Base):
@@ -21,7 +28,12 @@ class Subcategory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     name: Mapped[str]
+    display_name: Mapped[str | None] = mapped_column(default=None)
     category: Mapped["Category"] = relationship(back_populates="subcategories")
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.name
 
 
 class Product(Base):

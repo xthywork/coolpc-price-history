@@ -113,6 +113,28 @@ def test_search_page_subcategory_select_and_filter():
     assert f'value="{sub1_id}" selected' in resp.text
 
 
+def test_search_page_shows_category_display_name_when_set():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA", display_name="顯卡")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="顯示名稱測試商品",
+                    current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "顯卡 / NVIDIA" in resp.text
+    assert "<td>顯卡</td>" in resp.text
+    assert "顯示卡VGA" not in resp.text
+
+
 def test_search_page_accepts_blank_form_fields_without_422():
     # 瀏覽器送出未填的下拉選單/數字欄位時，值是空字串而非省略整個參數
     # （例如 category_id=&min_price=&is_active=&min_change_percent=），
