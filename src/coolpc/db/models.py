@@ -15,6 +15,9 @@ class Category(Base):
     # 人工設定的顯示名稱，只影響畫面呈現；抓取比對永遠只認 name，不讀這個
     # 欄位，見 migrations/versions/0004_category_display_names.py 的說明。
     display_name: Mapped[str | None] = mapped_column(default=None)
+    # 人工設定的顯示排序，數字小排前面；None 排在所有有設定的後面，同樣
+    # 只影響畫面呈現，見 migrations/versions/0005_category_sort_order.py。
+    sort_order: Mapped[int | None] = mapped_column(default=None)
     subcategories: Mapped[list["Subcategory"]] = relationship(back_populates="category")
 
     @property

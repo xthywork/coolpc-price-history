@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api")
 
 @router.get("/categories", response_model=list[schemas.CategoryOut])
 def list_categories(session: Session = Depends(get_session)):
-    categories = session.query(Category).order_by(Category.id).all()
+    categories = session.query(Category).order_by(Category.sort_order.asc().nulls_last(), Category.name).all()
     return [schemas.CategoryOut(id=c.id, name=c.label) for c in categories]
 
 

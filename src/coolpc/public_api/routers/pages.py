@@ -71,7 +71,7 @@ def search_page(
     subcategory_rows = (
         session.query(Subcategory, Category)
         .join(Category, Subcategory.category_id == Category.id)
-        .order_by(Category.name, Subcategory.name)
+        .order_by(Category.sort_order.asc().nulls_last(), Category.name, Subcategory.name)
         .all()
     )
     subcategories = [
@@ -87,7 +87,7 @@ def search_page(
 
     return templates.TemplateResponse(request, "search.html", {
         "rows": rows,
-        "categories": session.query(Category).order_by(Category.name).all(),
+        "categories": session.query(Category).order_by(Category.sort_order.asc().nulls_last(), Category.name).all(),
         "subcategories": subcategories,
         "brands": brands,
         "query": {

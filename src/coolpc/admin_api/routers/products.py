@@ -24,7 +24,7 @@ def product_search(
     products, total = search_products(session, filters)
     return templates.TemplateResponse(request, "products.html", {
         "products": products, "total": total,
-        "categories": session.query(Category).order_by(Category.name).all(),
+        "categories": session.query(Category).order_by(Category.sort_order.asc().nulls_last(), Category.name).all(),
         "query": {"q": q or "", "category_id": category_id},
     })
 

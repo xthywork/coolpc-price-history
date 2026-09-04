@@ -135,6 +135,29 @@ def test_search_page_shows_category_display_name_when_set():
     assert "顯示卡VGA" not in resp.text
 
 
+def test_search_page_subcategory_dropdown_respects_category_sort_order():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        # 刻意讓 name 的字母順序跟 sort_order 相反，證明真的是照 sort_order排
+        cat_a = Category(name="Z分類", sort_order=2)
+        sub_a = Subcategory(name="子A", category=cat_a)
+        cat_b = Category(name="A分類", sort_order=1)
+        sub_b = Subcategory(name="子B", category=cat_b)
+        cat_c = Category(name="M分類")  # sort_order 未設定，應排最後
+        sub_c = Subcategory(name="子C", category=cat_c)
+        session.add_all([cat_a, sub_a, cat_b, sub_b, cat_c, sub_c])
+        session.commit()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    pos_a = resp.text.find("A分類 / 子B")
+    pos_b = resp.text.find("Z分類 / 子A")
+    pos_c = resp.text.find("M分類 / 子C")
+    assert pos_a != -1 and pos_b != -1 and pos_c != -1
+    assert pos_a < pos_b < pos_c
+
+
 def test_search_page_accepts_blank_form_fields_without_422():
     # 瀏覽器送出未填的下拉選單/數字欄位時，值是空字串而非省略整個參數
     # （例如 category_id=&min_price=&is_active=&min_change_percent=），
