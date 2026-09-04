@@ -35,21 +35,8 @@
     <input type="number" name="max_price" id="maxPriceInput" placeholder="最高價格" value="{{ query.max_price or '' }}">
   </div>
 </form>
-<script>
-(function () {
-  let priceDebounce;
-  function autoSubmitPriceFilter() {
-    clearTimeout(priceDebounce);
-    priceDebounce = setTimeout(() => {
-      document.getElementById('searchFiltersForm').submit();
-    }, 600);
-  }
-  document.getElementById('minPriceInput').addEventListener('input', autoSubmitPriceFilter);
-  document.getElementById('maxPriceInput').addEventListener('input', autoSubmitPriceFilter);
-})();
-</script>
 
-<p>共 {{ total }} 筆結果{% if last_updated %}　最後更新：{{ last_updated.strftime("%Y-%m-%d %H:%M") }}{% endif %}</p>
+<p>共 <span id="resultCount">{{ total }}</span> 筆結果{% if last_updated %}　最後更新：{{ last_updated.strftime("%Y-%m-%d %H:%M") }}{% endif %}</p>
 
 <style>
   #resultsTable { table-layout: fixed; }
@@ -85,7 +72,7 @@
 </div>
 
 <script>
-document.querySelectorAll('.compareCheckbox').forEach(cb => {
+function wireCompareCheckbox(cb) {
   const id = parseInt(cb.dataset.id, 10);
   cb.checked = window.coolpcCompare.has(id);
   cb.addEventListener('change', () => {
@@ -96,7 +83,74 @@ document.querySelectorAll('.compareCheckbox').forEach(cb => {
       window.coolpcCompare.remove(id);
     }
   });
-});
+}
+document.querySelectorAll('.compareCheckbox').forEach(wireCompareCheckbox);
+
+// 最低/最高價格：直接用 /api/products 重抓資料、只重繪表格本身（不整頁
+// reload、不透過 ?q= 這種導頁式更新），符合「輸入價格直接影響前端表格」。
+(function () {
+  const form = document.getElementById('searchFiltersForm');
+  const tbody = document.querySelector('#resultsTable tbody');
+  const resultCount = document.getElementById('resultCount');
+  const pagination = document.querySelector('.pagination');
+  let priceDebounce;
+
+  function buildLiveQuery() {
+    const params = new URLSearchParams();
+    ['q', 'subcategory_id', 'brand', 'is_active', 'sort', 'min_price', 'max_price'].forEach((name) => {
+      const el = form.elements[name];
+      if (el && el.value) params.set(name, el.value);
+    });
+    params.set('limit', '30');
+    return params;
+  }
+
+  function buildRow(item) {
+    const tr = document.createElement('tr');
+    if (!item.is_active) tr.className = 'inactive';
+    const nameTd = document.createElement('td');
+    const link = document.createElement('a');
+    link.href = `/products/${item.id}`;
+    link.textContent = item.current_name;
+    nameTd.appendChild(link);
+    const categoryTd = document.createElement('td');
+    categoryTd.textContent = item.category_name;
+    const priceTd = document.createElement('td');
+    priceTd.textContent = '$' + item.current_price.toLocaleString();
+    const statusTd = document.createElement('td');
+    statusTd.textContent = item.is_active ? '在售' : '已下架';
+    const checkboxTd = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'compareCheckbox';
+    checkbox.dataset.id = item.id;
+    checkboxTd.appendChild(checkbox);
+    tr.append(nameTd, categoryTd, priceTd, statusTd, checkboxTd);
+    return tr;
+  }
+
+  async function liveUpdateResults() {
+    const resp = await fetch(`/api/products?${buildLiveQuery().toString()}`);
+    const data = await resp.json();
+    tbody.innerHTML = '';
+    data.items.forEach((item) => {
+      const tr = buildRow(item);
+      tbody.appendChild(tr);
+      wireCompareCheckbox(tr.querySelector('.compareCheckbox'));
+    });
+    if (resultCount) resultCount.textContent = data.total;
+    // 分頁連結是依整頁載入當時的篩選條件組出來的固定 URL，這裡即時重繪的
+    // 結果一律視為新的第一頁，分頁連結先隱藏，避免點下去漏掉剛輸入的價格。
+    if (pagination) pagination.style.display = 'none';
+  }
+
+  function autoUpdatePriceFilter() {
+    clearTimeout(priceDebounce);
+    priceDebounce = setTimeout(liveUpdateResults, 400);
+  }
+  document.getElementById('minPriceInput').addEventListener('input', autoUpdatePriceFilter);
+  document.getElementById('maxPriceInput').addEventListener('input', autoUpdatePriceFilter);
+})();
 
 function makeColumnsResizable(table) {
   table.querySelectorAll('th').forEach(th => {

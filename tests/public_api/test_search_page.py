@@ -249,9 +249,12 @@ def test_search_page_price_inputs_moved_last_to_own_row_with_auto_submit():
     pos_button = resp.text.find(">搜尋<")
     assert pos_button != -1
     assert pos_button < pos_min_price
-    # 價格欄位變動要自動送出表單（動態更新下方列表），不需要按搜尋
+    # 價格欄位變動要用 /api/products 局部重繪表格（不是 ?q= 整頁導頁式更新，
+    # 也不是呼叫 form.submit() 整頁 reload）
     assert "minPriceInput" in resp.text and "addEventListener" in resp.text
-    assert "searchFiltersForm" in resp.text
+    assert "/api/products?" in resp.text
+    assert "resultCount" in resp.text
+    assert ".submit()" not in resp.text
 
 
 def test_base_layout_has_compare_clear_control():
@@ -326,7 +329,8 @@ def test_search_page_shows_global_last_updated_after_result_count():
 
     resp = client.get("/")
     assert resp.status_code == 200
-    count_pos = resp.text.find("共 2 筆結果")
+    assert '<span id="resultCount">2</span>' in resp.text
+    count_pos = resp.text.find('id="resultCount"')
     updated_pos = resp.text.find("最後更新")
     assert count_pos != -1
     assert updated_pos != -1
