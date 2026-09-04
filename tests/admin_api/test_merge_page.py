@@ -349,9 +349,18 @@ def test_merge_page_has_compare_style_chip_picker_with_target_marker():
     assert 'id="targetInput"' not in resp.text
     assert 'id="sourceSearch"' not in resp.text
     assert "備用" not in resp.text
-    # 多出來的功能：標記保留（目標）商品
+    # 多出來的功能：標記保留（目標）商品，且標記要在每一列最左側
     assert "mergeChipTargetRadio" in resp.text
-    assert "保留（合併後的目標商品）" in resp.text
+    assert "保留（目標商品）" in resp.text
+    # 用帶引號的 class="..." 屬性字串比對，確保比對到的是 JS 組出來的 chip
+    # HTML 本身的欄位順序，不是誤中前面 CSS 選擇器（.mergeChipTargetLabel
+    # 在 CSS 裡本來就寫在 .mergeChipName 後面，跟畫面上的實際順序無關）。
+    target_label_pos = resp.text.find('class="mergeChipTargetLabel"')
+    name_span_pos = resp.text.find('class="mergeChipName"')
+    assert target_label_pos != -1 and name_span_pos != -1
+    assert target_label_pos < name_span_pos
+    # 一個商品一行（直向排列），不是並排的卡片
+    assert "flex-direction: column" in resp.text
     # 最終送出的欄位名稱不變，後端 /merge 路由不用改
     assert 'name="source_id"' in resp.text
     assert 'name="target_id"' in resp.text

@@ -8,16 +8,15 @@
 <style>
   #mergePickerBox { position: relative; max-width: 640px; }
   #mergeSearchInput { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
-  #mergeChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  #mergeChips { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-width: 640px; }
   .mergeChip {
-    display: flex; flex-direction: column; gap: 4px; max-width: 280px;
+    display: flex; align-items: center; gap: 10px;
     background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 8px 10px;
   }
-  .mergeChipTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
-  .mergeChipName { white-space: normal; word-break: break-word; font-size: 13px; line-height: 1.3; }
+  .mergeChipName { white-space: normal; word-break: break-word; font-size: 13px; line-height: 1.3; flex: 1; }
   .mergeChipRemove { cursor: pointer; color: #6366f1; font-weight: bold; flex-shrink: 0; }
   .mergeChipRemove:hover { color: #ef4444; }
-  .mergeChipTargetLabel { font-size: 12px; color: #374151; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .mergeChipTargetLabel { font-size: 12px; color: #374151; display: flex; align-items: center; gap: 4px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
   #mergeSearchResults {
     position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
     background: #fff; border: 1px solid #d1d5db; border-radius: 6px;
@@ -108,14 +107,12 @@
     chip.className = 'mergeChip';
     chip.dataset.id = id;
     chip.innerHTML =
-      '<div class="mergeChipTop">' +
-        '<span class="mergeChipName"></span>' +
-        '<span class="mergeChipRemove" title="移除">✕</span>' +
-      '</div>' +
       '<label class="mergeChipTargetLabel">' +
         '<input type="radio" name="mergeTargetChoice" class="mergeChipTargetRadio">' +
-        '保留（合併後的目標商品）' +
-      '</label>';
+        '保留（目標商品）' +
+      '</label>' +
+      '<span class="mergeChipName"></span>' +
+      '<span class="mergeChipRemove" title="移除">✕</span>';
     chip.querySelector('.mergeChipName').textContent = name;
     chipsBox.appendChild(chip);
     wireChip(chip);
