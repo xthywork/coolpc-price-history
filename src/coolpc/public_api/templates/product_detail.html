@@ -6,7 +6,7 @@
   <h1>{{ product.current_name }}</h1>
   <div class="product-meta">
     <span>{{ category.label }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}</span>
-    <span>{{ "在售中" if product.is_active else "已下架" }}</span>
+    <span>{{ "販售中" if product.is_active else "已下架" }}</span>
     <span>首次出現 <span class="mono">{{ product.created_at.strftime("%Y-%m-%d") }}</span></span>
     <span>最後出現 <span class="mono">{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</span></span>
     <button type="button" id="compareToggle" aria-pressed="false">加入比較</button>

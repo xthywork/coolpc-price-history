@@ -70,26 +70,12 @@
 /* ── 搜尋結果表 ─────────────────────────────────────────── */
 
 .results th, .results td { padding-block: 9px; }
-.results .col-spark { width: 96px; padding-inline: var(--space-2); }
-.results .col-price { width: 104px; }
-.results .col-change { width: 108px; }
-.results .col-pick { width: 40px; text-align: center; }
+.results .col-price { width: 118px; }
+.results .col-status { width: 96px; }
+.results .col-pick { width: 64px; text-align: center; }
 .results tbody td:first-child { padding-left: var(--space-3); }
 .results .name { display: block; line-height: 1.35; }
-.results .cat { color: var(--muted); font-size: var(--step--2); }
-.results .badge-low {
-  color: var(--down);
-  font-size: var(--step--2);
-  border: 1px solid currentColor;
-  border-radius: var(--radius);
-  padding: 0 4px;
-  margin-left: 6px;
-  white-space: nowrap;
-}
-.spark { display: block; width: 88px; height: 22px; }
-.spark__line { fill: none; stroke: var(--flat); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.spark--up .spark__line { stroke: var(--up); }
-.spark--down .spark__line { stroke: var(--down); }
+.results .cat { display: block; padding-left: 1.4em; color: var(--muted); font-size: var(--step--2); }
 
 /* ── 商品詳細頁：價格是主角 ─────────────────────────────── */
 
@@ -148,7 +134,6 @@
 
 @media (max-width: 720px) {
   .price-facts { margin-left: 0; width: 100%; }
-  .results .col-spark { display: none; }
 }
 
 
@@ -170,8 +155,7 @@
 .compare-chip button { border: none; background: none; color: var(--muted); padding: 0 2px; line-height: 1; }
 .compare-chip button:hover { color: var(--up); }
 
-.results .cat { display: block; color: var(--muted); font-size: var(--step--2); }
-.results .col-change { white-space: nowrap; }
+.results .cat { display: block; padding-left: 1.4em; color: var(--muted); font-size: var(--step--2); }
 
 /* 欄寬可拖曳（沿用改版前就有的行為） */
 #resultsTable { table-layout: fixed; }
@@ -251,7 +235,6 @@
 @media (max-width: 640px) {
   #resultsTable { table-layout: auto; }
   #resultsTable td { overflow: visible; }
-  .results .col-change { display: none; }
-  .results .col-price { width: auto; }
+  .results .col-price, .results .col-status { width: auto; }
   .results th, .results td { padding-inline: var(--space-2); }
 }

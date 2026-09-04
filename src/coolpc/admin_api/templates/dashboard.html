@@ -4,6 +4,7 @@
 
 <div class="page-head">
   <h1>抓取狀態</h1>
+  <span class="page-head__count">{{ "{:,}".format(total) }} 次</span>
   <div class="page-head__end">
     <form method="post" action="/scrape">
       <button type="submit" data-variant="primary">立即抓取一次</button>
@@ -44,4 +45,56 @@
   </table>
   {% if not snapshots %}<div class="empty">還沒有抓取記錄。按「立即抓取一次」開始。</div>{% endif %}
 </div>
+
+<div class="pagination">
+  <div class="pagination__pages">
+    {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}" rel="prev">上一頁</a>{% endif %}
+    {% for p in page_list %}
+      {% if p is none %}
+      <span class="is-gap">…</span>
+      {% elif p == page %}
+      <span class="is-current" aria-current="page">{{ p }}</span>
+      {% else %}
+      <a href="/?{{ query_string }}&page={{ p }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}" rel="next">下一頁</a>{% endif %}
+  </div>
+  <div class="pagination__jump">
+    <label for="jumpPageInput">跳至</label>
+    <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}">
+    <span>／ {{ "{:,}".format(total_pages) }} 頁</span>
+    <select id="pageSizeSelect" aria-label="每頁筆數">
+      {% for opt in page_size_options %}
+      <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
+      {% endfor %}
+      <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
+    </select>
+  </div>
+</div>
+
+<script>
+// 這一頁沒有篩選表單，換頁與每頁筆數都直接組 URL 導頁
+const jumpPageInput = document.getElementById('jumpPageInput');
+if (jumpPageInput) {
+  jumpPageInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const target = parseInt(jumpPageInput.value, 10);
+    if (!target || target < 1) return;
+    const params = new URLSearchParams('{{ query_string }}');
+    params.set('page', target);
+    window.location.href = '/?' + params.toString();
+  });
+}
+
+const pageSizeSelect = document.getElementById('pageSizeSelect');
+if (pageSizeSelect) {
+  pageSizeSelect.addEventListener('change', () => {
+    const params = new URLSearchParams();
+    params.set('page_size', pageSizeSelect.value);
+    window.location.href = '/?' + params.toString();
+  });
+}
+</script>
 {% endblock %}

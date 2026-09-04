@@ -68,7 +68,6 @@ chip 挑選器、商品編輯頁的分類/子分類連動下拉選單）都是�
 | `css/admin.css` | 管理介面專用 |
 | `fonts/*.woff2` | IBM Plex Mono（SIL OFL），只用於需要對齊的英數字串 |
 | `js/theme.js` | 明暗主題切換與記憶，並在切換時發出 `coolpc:themechange` |
-| `js/sparkline.js` | 搜尋結果每列的迷你走勢圖與區間漲跌（自繪 inline SVG） |
 | `js/chart-theme.js` | 讓 Chart.js 的軸線與文字跟著主題走 |
 | `js/vendor/chart.umd.min.js` | Chart.js，self-host |
 
@@ -79,11 +78,11 @@ chip 挑選器、商品編輯頁的分類/子分類連動下拉選單）都是�
 第三方資產一律 self-host，不從外部 CDN 載入——這是自架服務，外部 CDN 是
 不必要的單點故障。
 
-搜尋結果的迷你走勢圖由 `GET /api/products/sparklines` 批次供應（見
+`GET /api/products/sparklines` 批次供應多個商品的取樣價格點（見
 `stats/service.py` 的 `get_sparkline_points`）：先取最近 N 天，該期間沒有
-資料的商品（例如早就下架的）改取它自己最後幾筆，整批只發兩次查詢，前端在
-表格畫完之後才非同步補上。端點一次最多接受 100 個商品，每頁筆數超過這個
-數字時整欄跳過。
+資料的商品（例如早就下架的）改取它自己最後幾筆，整批只發兩次查詢，一次
+最多接受 100 個商品。搜尋頁曾經用它畫每列的迷你走勢圖，後來走勢欄依需求
+移除，這個端點現在只作為公開 JSON API 的一部分，沒有前端使用者。
 
 ## 資料流：抓取 → 解析 → 寫入 → 服務
 

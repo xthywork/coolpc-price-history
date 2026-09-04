@@ -445,16 +445,20 @@ def test_search_page_results_table_only_has_four_columns_plus_checkbox():
     assert "30天最低" not in resp.text
     assert "30天最高" not in resp.text
     assert "<th>最後更新</th>" not in resp.text
-    # 欄位就是這五個：商品、走勢、價格、區間漲跌、比較勾選
+    # 欄位就是這四個：商品、價格、狀態、比較勾選
     thead = resp.text[resp.text.find("<thead>"):resp.text.find("</thead>")]
-    assert thead.count("</th>") == 5
-    for header in (">商品<", ">走勢<", ">價格<", ">區間漲跌<", ">比較<"):
+    assert thead.count("</th>") == 4
+    for header in (">商品<", ">價格<", ">狀態<", ">比較<"):
         assert header in thead
-    # 分類與下架狀態併進商品欄，不再各佔一欄
+    # 比較欄的欄名要看得見，不是只給螢幕閱讀器
+    assert '<th class="col-pick">比較</th>' in thead
+    # 分類跟在商品名底下，不另外佔一欄
     assert 'class="cat"' in resp.text
+    # 販售狀態獨立成欄，用詞跟篩選選單一致
+    assert '<td class="col-status">已下架</td>' in resp.text or \
+           '<td class="col-status">販售中</td>' in resp.text
     # 商品欄是唯一沒有固定寬度的欄，才吃得到剩下的所有寬度
     assert "<th>商品</th>" in thead
-    assert thead.count("col-spark") == 1
     assert f'data-id="{product_id}"' in resp.text
     assert 'class="compareCheckbox"' in resp.text
 

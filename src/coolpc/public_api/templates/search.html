@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}商品搜尋 - 原價屋歷史價格查詢{% endblock %}
-{% block body_attrs %} data-spark-days="30"{% endblock %}
 {% block content %}
 
 <form class="search-head" method="get" action="/" id="searchFiltersForm">
@@ -23,9 +22,9 @@
       {% endfor %}
     </select>
     <select name="is_active" aria-label="銷售狀態">
-      <option value="">在售與下架</option>
-      <option value="true" {% if query.is_active == True %}selected{% endif %}>只看在售</option>
-      <option value="false" {% if query.is_active == False %}selected{% endif %}>只看下架</option>
+      <option value="">販售中與已下架</option>
+      <option value="true" {% if query.is_active == True %}selected{% endif %}>販售中</option>
+      <option value="false" {% if query.is_active == False %}selected{% endif %}>已下架</option>
     </select>
     <select name="sort" aria-label="排序">
       <option value="price_asc" {% if query.sort == "price_asc" %}selected{% endif %}>價格低到高</option>
@@ -43,7 +42,7 @@
 
   {% if latest_snapshot %}
   <div class="pulse">
-    <span class="pulse__stamp">{{ latest_snapshot.fetched_at.strftime("%m-%d %H:%M") }} 那次抓到</span>
+    <span class="pulse__stamp">更新時間：{{ latest_snapshot.fetched_at.strftime("%m-%d %H:%M") }}</span>
     <span class="pulse__item"><span class="pulse__value">{{ "{:,}".format(latest_snapshot.total_products) }}</span> 項商品</span>
     <span class="pulse__item"><span class="pulse__value up">{{ latest_snapshot.price_up_count }}</span> 漲價</span>
     <span class="pulse__item"><span class="pulse__value down">{{ latest_snapshot.price_down_count }}</span> 降價</span>
@@ -63,10 +62,9 @@
     <thead>
       <tr>
         <th>商品</th>
-        <th class="col-spark">走勢</th>
         <th class="col-num col-price">價格</th>
-        <th class="col-num col-change">區間漲跌</th>
-        <th class="col-pick"><span class="visually-hidden">比較</span></th>
+        <th class="col-status">狀態</th>
+        <th class="col-pick">比較</th>
       </tr>
     </thead>
     <tbody>
@@ -74,11 +72,10 @@
       <tr class="{% if not row.product.is_active %}inactive{% endif %}">
         <td>
           <a class="name" href="/products/{{ row.product.id }}">{{ row.product.current_name }}</a>
-          <span class="cat">{{ row.category.label }}{% if not row.product.is_active %} · 已下架{% endif %}</span>
+          <span class="cat">{{ row.category.label }}</span>
         </td>
-        <td class="col-spark" data-spark-id="{{ row.product.id }}"></td>
         <td class="col-num col-price">{{ "{:,}".format(row.product.current_price) }}</td>
-        <td class="col-num col-change" data-change-id="{{ row.product.id }}"></td>
+        <td class="col-status">{{ "販售中" if row.product.is_active else "已下架" }}</td>
         <td class="col-pick"><input type="checkbox" class="compareCheckbox" data-id="{{ row.product.id }}" aria-label="加入比較"></td>
       </tr>
       {% endfor %}
@@ -116,7 +113,6 @@
   </div>
 </div>
 
-<script src="/static/js/sparkline.js"></script>
 <script>
 // 改變「每頁顯示幾筆」會整頁 reload；還原成上次操作時的捲動位置，而不是
 // 每次都跳回最上面。這段必須放在表格/分頁的 HTML 都解析完之後才執行，
@@ -199,20 +195,16 @@ if (pageSizeSelect) {
     link.textContent = item.current_name;
     const cat = document.createElement('span');
     cat.className = 'cat';
-    cat.textContent = item.is_active ? item.category_name : `${item.category_name} · 已下架`;
+    cat.textContent = item.category_name;
     nameTd.append(link, cat);
-
-    const sparkTd = document.createElement('td');
-    sparkTd.className = 'col-spark';
-    sparkTd.dataset.sparkId = item.id;
 
     const priceTd = document.createElement('td');
     priceTd.className = 'col-num col-price';
     priceTd.textContent = item.current_price.toLocaleString();
 
-    const changeTd = document.createElement('td');
-    changeTd.className = 'col-num col-change';
-    changeTd.dataset.changeId = item.id;
+    const statusTd = document.createElement('td');
+    statusTd.className = 'col-status';
+    statusTd.textContent = item.is_active ? '販售中' : '已下架';
 
     const checkboxTd = document.createElement('td');
     checkboxTd.className = 'col-pick';
@@ -223,7 +215,7 @@ if (pageSizeSelect) {
     checkbox.setAttribute('aria-label', '加入比較');
     checkboxTd.appendChild(checkbox);
 
-    tr.append(nameTd, sparkTd, priceTd, changeTd, checkboxTd);
+    tr.append(nameTd, priceTd, statusTd, checkboxTd);
     return tr;
   }
 
@@ -237,8 +229,6 @@ if (pageSizeSelect) {
       wireCompareCheckbox(tr.querySelector('.compareCheckbox'));
     });
     if (resultCount) resultCount.textContent = data.total.toLocaleString();
-    // 表格整批換掉之後走勢圖也要跟著重畫，否則新的列會一直空著
-    if (window.coolpcSparkline) window.coolpcSparkline.refresh();
     // 分頁連結是依整頁載入當時的篩選條件組出來的固定 URL，這裡即時重繪的
     // 結果一律視為新的第一頁，分頁連結先隱藏，避免點下去漏掉剛輸入的價格。
     if (pagination) pagination.style.display = 'none';

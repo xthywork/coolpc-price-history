@@ -24,7 +24,7 @@
     <dt>型號</dt><dd class="mono">{{ product.model or "—" }}</dd>
     <dt>原始狀態</dt><dd>{{ product.current_status or "—" }}</dd>
     <dt>目前價格</dt><dd class="mono">{{ "{:,}".format(product.current_price) }}</dd>
-    <dt>是否在售</dt><dd>{{ "在售" if product.is_active else "已下架" }}</dd>
+    <dt>是否在售</dt><dd>{{ "販售中" if product.is_active else "已下架" }}</dd>
     <dt>最後一次出現</dt><dd class="mono">{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</dd>
     <dt>建立時間</dt><dd class="mono">{{ product.created_at.strftime("%Y-%m-%d %H:%M") }}</dd>
   </dl>
@@ -65,7 +65,7 @@
 
       <label for="f-active">是否在售</label>
       <select id="f-active" name="is_active">
-        <option value="true" {% if product.is_active %}selected{% endif %}>在售</option>
+        <option value="true" {% if product.is_active %}selected{% endif %}>販售中</option>
         <option value="false" {% if not product.is_active %}selected{% endif %}>已下架</option>
       </select>
 

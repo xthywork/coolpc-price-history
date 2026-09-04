@@ -19,9 +19,9 @@
     {% endfor %}
   </select>
   <select name="is_active" aria-label="銷售狀態">
-    <option value="">在售與下架</option>
-    <option value="true" {% if query.is_active == True %}selected{% endif %}>只看在售</option>
-    <option value="false" {% if query.is_active == False %}selected{% endif %}>只看下架</option>
+    <option value="">販售中與已下架</option>
+    <option value="true" {% if query.is_active == True %}selected{% endif %}>販售中</option>
+    <option value="false" {% if query.is_active == False %}selected{% endif %}>已下架</option>
   </select>
   <button type="submit" data-variant="primary">搜尋</button>
 </form>
@@ -47,7 +47,7 @@
         <td>{{ p.brand or "" }}</td>
         <td class="mono">{{ p.model or "" }}</td>
         <td class="col-num">{{ "{:,}".format(p.current_price) }}</td>
-        <td>{{ "在售" if p.is_active else "已下架" }}</td>
+        <td>{{ "販售中" if p.is_active else "已下架" }}</td>
         <td class="mono">{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
       </tr>
       {% endfor %}

@@ -23,6 +23,8 @@
   --surface: #ffffff;
   --surface-sunk: #f5f6f7;
   --ink: #14161a;
+  /* 已下架商品名用這一階：明顯比販售中淡，但沒有淡到讀不出來 */
+  --ink-dim: #4a5057;
   --muted: #565b63;
   --line: #dcdde0;
   --line-strong: #c3c5ca;
@@ -71,6 +73,7 @@
   --surface: #181d28;
   --surface-sunk: #141924;
   --ink: #e6e8ec;
+  --ink-dim: #aeb5c0;
   --muted: #9ba3b2;
   --line: #262d3a;
   --line-strong: #38414f;
@@ -95,6 +98,7 @@
     --surface: #181d28;
     --surface-sunk: #141924;
     --ink: #e6e8ec;
+    --ink-dim: #aeb5c0;
     --muted: #9ba3b2;
     --line: #262d3a;
     --line-strong: #38414f;
