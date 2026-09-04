@@ -239,3 +239,43 @@ def test_similarity_hints_page_has_checkbox_and_no_per_row_action_column():
     assert "批量忽略" in resp.text
     # 舊版每列一個「不是同一商品，忽略」的獨立表單已移除
     assert "不是同一商品，忽略" not in resp.text
+
+
+def test_similarity_hints_page_stacks_products_vertically_with_score_beside_and_group_separation():
+    """商品 A / 商品 B 要一個一列（上下堆疊），不是左右分欄；相似度顯示在
+    整組旁邊；每組候選（card）之間要有清楚的視覺分隔，方便快速比對合併。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="堆疊排版測試A",
+                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="堆疊排版測試B",
+                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([a, b])
+        session.flush()
+        hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8,
+                               computed_at=t, dismissed=False)
+        session.add(hint)
+        session.commit()
+
+    resp = client.get("/similarity-hints")
+    assert resp.status_code == 200
+    # 不再是表格版面
+    assert "<table>" not in resp.text
+    assert "<thead>" not in resp.text
+    # 一組（card）裡，商品 A 的整行要先於商品 B 的整行出現（上下堆疊），
+    # 且兩者之間要有一個分隔元素。用帶引號的 class="..." 屬性字串比對，
+    # 確保比對到的是實際的 <div> 元素，不是誤中前面 CSS 的 .hintDivider 選
+    # 擇器（CSS 定義本來就寫在所有卡片內容之前，跟畫面上的實際順序無關）。
+    a_row_pos = resp.text.find("堆疊排版測試A")
+    divider_pos = resp.text.find('class="hintDivider"')
+    b_row_pos = resp.text.find("堆疊排版測試B")
+    assert a_row_pos != -1 and divider_pos != -1 and b_row_pos != -1
+    assert a_row_pos < divider_pos < b_row_pos
+    # 相似度要在同一組（card）內，顯示在商品旁邊，而不是獨立的表格欄位
+    assert "hintScore" in resp.text
+    assert "hintGroup" in resp.text
