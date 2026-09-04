@@ -2,8 +2,11 @@
 {% block title %}商品搜尋 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
 <form class="filters" method="get" action="/" id="searchFiltersForm" style="display:block;">
-  <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-    <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}">
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}" style="flex:1; min-width:200px;">
+    <button type="submit">搜尋</button>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
     <select name="subcategory_id">
       <option value="">全部分類</option>
       {% for sc in subcategories %}
@@ -28,7 +31,6 @@
       <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
       <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
     </select>
-    <button type="submit" style="margin-left:auto;">搜尋</button>
   </div>
   <div style="display:flex; gap:8px; margin-top:8px;">
     <input type="number" name="min_price" id="minPriceInput" placeholder="最低價格" value="{{ query.min_price or '' }}">

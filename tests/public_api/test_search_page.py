@@ -353,6 +353,21 @@ def test_search_page_price_inputs_moved_last_to_own_row_with_auto_submit():
     assert "minPriceInput" in resp.text and "addEventListener" in resp.text
     assert "/api/products?" in resp.text
     assert "resultCount" in resp.text
+
+
+def test_search_page_keyword_input_wide_button_beside_it_dropdowns_on_next_row():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # 關鍵字輸入框變寬（flex:1），搜尋按鈕緊接在它右側，不再用 margin-left:auto
+    # 靠右對齊
+    pos_q = resp.text.find('name="q"')
+    pos_button = resp.text.find(">搜尋<")
+    pos_subcategory = resp.text.find('name="subcategory_id"')
+    assert pos_q != -1 and pos_button != -1 and pos_subcategory != -1
+    assert pos_q < pos_button < pos_subcategory
+    assert "flex:1" in resp.text
+    assert "margin-left:auto" not in resp.text
     autoupdate_start = resp.text.find("function autoUpdatePriceFilter")
     autoupdate_end = resp.text.find("})();", autoupdate_start)
     assert autoupdate_start != -1 and autoupdate_end != -1
