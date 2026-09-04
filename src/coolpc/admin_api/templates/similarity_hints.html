@@ -6,7 +6,7 @@
 <form method="post" action="/similarity-hints/refresh">
   <button type="submit">重新計算相似度候選</button>
 </form>
-<p>以下為系統依名稱相似度找出的候選。勾選後可「批量合併」（自動以仍在上架中、或最近更新較新的商品當保留的主商品），或「批量忽略」（標記為不是同一商品，之後不再出現）。</p>
+<p>以下為系統依名稱相似度找出的候選。勾選後可合併（自動以仍在上架中、或最近更新較新的商品當保留的主商品），或忽略（標記為不是同一商品，之後不再出現）。</p>
 <style>
   .hintGroup {
     display: flex; align-items: stretch; gap: 12px;
@@ -32,8 +32,9 @@
   .hintScoreLabel { font-size: 11px; color: #9ca3af; }
 </style>
 <form method="post" id="hintsForm">
-  <button type="submit" formaction="/similarity-hints/batch-merge">批量合併</button>
-  <button type="submit" formaction="/similarity-hints/batch-dismiss">批量忽略（不是同一商品）</button>
+  <button type="submit" formaction="/similarity-hints/batch-merge">合併</button>
+  <button type="submit" formaction="/similarity-hints/batch-dismiss">忽略</button>
+  <button type="submit" formaction="/similarity-hints/batch-merge" id="mergeAllBtn">合併下列所有項目</button>
   <div style="margin-top:10px;">
     {% for row in rows %}
     <div class="hintGroup">
@@ -61,4 +62,14 @@
     {% endfor %}
   </div>
 </form>
+
+<script>
+document.getElementById('mergeAllBtn').addEventListener('click', (e) => {
+  const checkboxes = document.querySelectorAll('.hintGroupCheckbox input');
+  if (!checkboxes.length) { e.preventDefault(); return; }
+  const ok = confirm(`確定要合併下列所有 ${checkboxes.length} 組候選嗎？合併後仍可在下方的合併紀錄個別 Undo。`);
+  if (!ok) { e.preventDefault(); return; }
+  checkboxes.forEach((cb) => { cb.checked = true; });
+});
+</script>
 {% endblock %}

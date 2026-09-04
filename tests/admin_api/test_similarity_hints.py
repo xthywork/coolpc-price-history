@@ -235,8 +235,10 @@ def test_similarity_hints_page_has_checkbox_and_no_per_row_action_column():
     resp = client.get("/similarity-hints")
     assert resp.status_code == 200
     assert f'name="hint_ids" value="{hint_id}"' in resp.text
-    assert "批量合併" in resp.text
-    assert "批量忽略" in resp.text
+    # 按鈕文字不再有「批量」二字與括號說明
+    assert ">合併<" in resp.text
+    assert ">忽略<" in resp.text
+    assert "批量" not in resp.text
     # 舊版每列一個「不是同一商品，忽略」的獨立表單已移除
     assert "不是同一商品，忽略" not in resp.text
 
@@ -279,3 +281,32 @@ def test_similarity_hints_page_stacks_products_vertically_with_score_beside_and_
     # 相似度要在同一組（card）內，顯示在商品旁邊，而不是獨立的表格欄位
     assert "hintScore" in resp.text
     assert "hintGroup" in resp.text
+
+
+def test_similarity_hints_page_has_merge_all_button_with_confirm_and_reuses_batch_merge_endpoint():
+    """「合併下列所有項目」要送到既有的 /similarity-hints/batch-merge（沿用同一套
+    後端邏輯，不需要新路由），點擊時要先跳出確認對話框，確認後才把畫面上
+    所有候選的核取方塊全部勾選再送出——不是只送目前手動勾選的那幾組。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        a = Product(category_id=cat.id, subcategory_id=sub.id, current_name="全部合併測試A",
+                   current_price=100, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        b = Product(category_id=cat.id, subcategory_id=sub.id, current_name="全部合併測試B",
+                   current_price=200, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([a, b])
+        session.flush()
+        hint = SimilarityHint(product_a_id=a.id, product_b_id=b.id, score=0.8,
+                               computed_at=t, dismissed=False)
+        session.add(hint)
+        session.commit()
+
+    resp = client.get("/similarity-hints")
+    assert resp.status_code == 200
+    assert '<button type="submit" formaction="/similarity-hints/batch-merge" id="mergeAllBtn">合併下列所有項目</button>' in resp.text
+    assert "confirm(" in resp.text
+    assert "cb.checked = true" in resp.text
