@@ -228,3 +228,55 @@ def test_search_products_and_returns_empty_when_only_some_tokens_match():
 
     results = search_products_and(session, "ASUS RTX 5070 PRIME 12G")
     assert results == []
+
+
+def test_search_sort_by_brand_puts_null_brand_last():
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "無品牌商品", 1000, True, t, brand=None)
+    _add(session, cat, sub, "ZOTAC商品", 1000, True, t, brand="ZOTAC")
+    _add(session, cat, sub, "ASUS商品", 1000, True, t, brand="ASUS")
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(sort="brand_asc"))
+    assert total == 3
+    assert [p.brand for p in results] == ["ASUS", "ZOTAC", None]
+
+
+def test_search_sort_by_status_puts_active_first():
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "下架商品", 1000, False, t)
+    _add(session, cat, sub, "上架商品", 1000, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(sort="status_active_first"))
+    assert total == 2
+    assert [p.is_active for p in results] == [True, False]
+
+
+def test_search_sort_by_category_respects_custom_sort_order():
+    session = _session()
+    cat_first = Category(name="Z分類", sort_order=1)
+    sub_first = Subcategory(name="子1", category=cat_first)
+    cat_second = Category(name="A分類", sort_order=2)
+    sub_second = Subcategory(name="子2", category=cat_second)
+    session.add_all([cat_first, sub_first, cat_second, sub_second])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat_second, sub_second, "第二分類的商品", 1000, True, t)
+    _add(session, cat_first, sub_first, "第一分類的商品", 1000, True, t)
+    session.commit()
+
+    results, total = search_products(session, SearchFilters(sort="category_asc"))
+    assert total == 2
+    # 依 sort_order（1 在前），而不是分類名稱字母順序（"A分類" 應該會先出現）
+    assert [p.current_name for p in results] == ["第一分類的商品", "第二分類的商品"]

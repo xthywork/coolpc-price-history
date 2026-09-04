@@ -219,6 +219,22 @@ def test_search_page_removed_fields_are_gone():
     assert 'name="subcategory_id"' in resp.text
 
 
+def test_search_page_recent_change_select_removed_and_sort_options_reduced():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert 'name="recent_change"' not in resp.text
+    assert "最近漲價" not in resp.text
+    assert "最近降價" not in resp.text
+    assert 'value="last_seen_desc"' not in resp.text
+    assert 'value="name_asc"' not in resp.text
+    assert 'value="price_asc"' in resp.text
+    assert 'value="price_desc"' in resp.text
+    assert 'value="brand_asc"' in resp.text
+    assert 'value="category_asc"' in resp.text
+    assert 'value="status_active_first"' in resp.text
+
+
 def test_base_layout_has_compare_clear_control():
     # 「清空比較清單」連結已搬到 /compare 頁面本身（見 test_compare_page.py），
     # base.html（所有頁面共用）不應該再有這個控制項；coolpcCompare.clear() 方法本身仍保留。

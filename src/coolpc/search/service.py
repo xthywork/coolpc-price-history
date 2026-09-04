@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from coolpc.db.models import Product, ProductName
+from coolpc.db.models import Category, Product, ProductName
 
 
 @dataclass
@@ -28,6 +28,8 @@ _SORT_MAP = {
     "price_asc": Product.current_price.asc(),
     "price_desc": Product.current_price.desc(),
     "name_asc": Product.current_name.asc(),
+    "brand_asc": Product.brand.asc().nulls_last(),
+    "status_active_first": Product.is_active.desc(),
 }
 
 
@@ -74,7 +76,15 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
         query = query.filter(Product.last_change_percent <= filters.max_change_percent)
 
     total = query.count()
-    query = query.order_by(_SORT_MAP.get(filters.sort, Product.last_seen_at.desc()))
+    if filters.sort == "category_asc":
+        # 依分類的自訂顯示順序排序（見 Category.sort_order），跟分類下拉
+        # 選單的順序一致，而不是依原價屋原始分類名稱的字母順序。
+        query = (
+            query.join(Category, Product.category_id == Category.id)
+            .order_by(Category.sort_order.asc().nulls_last(), Category.name.asc())
+        )
+    else:
+        query = query.order_by(_SORT_MAP.get(filters.sort, Product.last_seen_at.desc()))
     query = query.offset(filters.offset).limit(filters.limit)
     return query.all(), total
 

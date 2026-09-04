@@ -22,16 +22,12 @@
     <option value="true" {% if query.is_active == True %}selected{% endif %}>僅在售</option>
     <option value="false" {% if query.is_active == False %}selected{% endif %}>僅下架</option>
   </select>
-  <select name="recent_change">
-    <option value="">漲跌</option>
-    <option value="up" {% if query.recent_change == "up" %}selected{% endif %}>最近漲價</option>
-    <option value="down" {% if query.recent_change == "down" %}selected{% endif %}>最近降價</option>
-  </select>
   <select name="sort">
-    <option value="last_seen_desc" {% if query.sort == "last_seen_desc" %}selected{% endif %}>最近更新</option>
     <option value="price_asc" {% if query.sort == "price_asc" %}selected{% endif %}>價格低到高</option>
     <option value="price_desc" {% if query.sort == "price_desc" %}selected{% endif %}>價格高到低</option>
-    <option value="name_asc" {% if query.sort == "name_asc" %}selected{% endif %}>名稱排序</option>
+    <option value="brand_asc" {% if query.sort == "brand_asc" %}selected{% endif %}>品牌</option>
+    <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
+    <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
   </select>
   <button type="submit">搜尋</button>
 </form>

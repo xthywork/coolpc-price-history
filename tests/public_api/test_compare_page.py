@@ -33,6 +33,44 @@ def test_compare_page_without_ids_shows_form_only():
     assert "商品比較" in resp.text
 
 
+def test_compare_page_has_five_horizontal_search_slots_not_plain_id_textbox():
+    client, _ = _make_client()
+    resp = client.get("/compare")
+    assert resp.status_code == 200
+    assert resp.text.count('class="compareSlot"') == 5
+    assert resp.text.count('class="compareSlotSearch"') == 5
+    assert 'type="hidden" name="ids"' in resp.text
+    assert "輸入商品 ID" not in resp.text
+
+
+def test_compare_page_slots_prefill_names_not_ids_for_existing_selection():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="下拉預填測試A",
+                     current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="下拉預填測試B",
+                     current_price=2000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.commit()
+        p1_id, p2_id = p1.id, p2.id
+
+    resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
+    assert resp.status_code == 200
+    # 名稱要出現在畫面可見的區塊裡（不是只在 hidden input 的 value）
+    assert f'>下拉預填測試A</div>' in resp.text
+    assert f'>下拉預填測試B</div>' in resp.text
+    # id 只能出現在 hidden input 裡，不能是看得到的文字內容
+    assert f'>{p1_id}<' not in resp.text
+    assert f'>{p2_id}<' not in resp.text
+    assert f'class="compareSlotId" value="{p1_id}"' in resp.text
+    assert f'class="compareSlotId" value="{p2_id}"' in resp.text
+
+
 def test_compare_page_shows_error_for_invalid_count():
     client, _ = _make_client()
     resp = client.get("/compare", params={"ids": "1"})

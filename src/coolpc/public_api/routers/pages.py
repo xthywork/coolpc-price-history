@@ -32,7 +32,7 @@ def search_page(
     recent_change: str | None = None,
     min_change_percent: OptionalFloat = None,
     max_change_percent: OptionalFloat = None,
-    sort: str = "last_seen_desc",
+    sort: str = "price_asc",
     page: int = 1,
     session: Session = Depends(get_session),
 ):
@@ -147,6 +147,8 @@ def compare_page(request: Request, ids: str | None = None, session: Session = De
                     break
                 items.append({"product": product, "stats": compute_product_stats(session, pid)})
 
+    padded_items = items + [None] * (5 - len(items))
     return templates.TemplateResponse(request, "compare.html", {
-        "items": items, "ids": ids or "", "error": error, "colors": COMPARE_COLORS,
+        "items": items, "padded_items": padded_items, "ids": ids or "",
+        "error": error, "colors": COMPARE_COLORS,
     })
