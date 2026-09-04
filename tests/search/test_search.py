@@ -9,10 +9,10 @@ def _session():
     Base.metadata.create_all(engine)
     return Session(engine)
 
-def _add(session, cat, sub, name, price, is_active, t, brand=None, model=None, last_change_amount=None):
+def _add(session, cat, sub, name, price, is_active, t, brand=None, model=None):
     p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name, brand=brand,
                 model=model, current_price=price, is_active=is_active, first_seen_at=t,
-                last_seen_at=t, created_at=t, last_change_amount=last_change_amount)
+                last_seen_at=t, created_at=t)
     session.add(p)
     session.flush()
     session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
@@ -119,22 +119,6 @@ def test_search_excludes_merged_away_products():
     results, total = search_products(session, SearchFilters())
     assert total == 1
     assert results[0].id == target.id
-
-def test_search_filters_recent_price_up():
-    session = _session()
-    cat = Category(name="顯示卡VGA")
-    sub = Subcategory(name="NVIDIA", category=cat)
-    session.add_all([cat, sub])
-    session.flush()
-    t = datetime.datetime(2026, 2, 1)
-    _add(session, cat, sub, "漲價商品", 9000, True, t, last_change_amount=500)
-    _add(session, cat, sub, "降價商品", 9000, True, t, last_change_amount=-300)
-    session.commit()
-
-    up, up_total = search_products(session, SearchFilters(recent_change="up"))
-    down, down_total = search_products(session, SearchFilters(recent_change="down"))
-    assert up_total == 1 and up[0].current_name == "漲價商品"
-    assert down_total == 1 and down[0].current_name == "降價商品"
 
 def test_search_pagination():
     session = _session()

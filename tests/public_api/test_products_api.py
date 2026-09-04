@@ -116,29 +116,6 @@ def test_list_products_filters_by_category_and_price():
     assert data["items"][0]["current_name"].startswith("ASUS")
 
 
-def test_list_products_filters_by_change_percent_range():
-    client, Session_ = _make_client()
-    with Session_() as session:
-        t = datetime.datetime(2026, 2, 1)
-        cat = Category(name="顯示卡VGA")
-        sub = Subcategory(name="NVIDIA", category=cat)
-        session.add_all([cat, sub])
-        session.flush()
-        big_jump = Product(category_id=cat.id, subcategory_id=sub.id, current_name="漲很多",
-                           current_price=1100, last_change_amount=100, last_change_percent=10.0,
-                           is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
-        small_jump = Product(category_id=cat.id, subcategory_id=sub.id, current_name="漲一點點",
-                             current_price=1010, last_change_amount=10, last_change_percent=1.0,
-                             is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
-        session.add_all([big_jump, small_jump])
-        session.commit()
-
-    resp = client.get("/api/products", params={"min_change_percent": 5})
-    data = resp.json()
-    assert data["total"] == 1
-    assert data["items"][0]["current_name"] == "漲很多"
-
-
 def test_list_products_accepts_blank_optional_query_params_without_422():
     # 前端表單或客戶端組裝查詢字串時常會送出空字串（而非完全省略參數），
     # 例如 category_id=&min_price=&is_active=；這些欄位是 int/bool/float，
@@ -146,8 +123,7 @@ def test_list_products_accepts_blank_optional_query_params_without_422():
     client, _Session_ = _make_client()
     resp = client.get("/api/products", params={
         "q": "", "category_id": "", "subcategory_id": "", "brand": "", "model": "",
-        "min_price": "", "max_price": "", "is_active": "", "recent_change": "",
-        "min_change_percent": "", "max_change_percent": "",
+        "min_price": "", "max_price": "", "is_active": "",
     })
     assert resp.status_code == 200
     assert resp.json()["total"] == 0

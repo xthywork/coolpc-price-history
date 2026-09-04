@@ -49,11 +49,6 @@ class Product(Base):
     model: Mapped[str | None] = mapped_column(default=None)
     current_status: Mapped[str | None] = mapped_column(default=None)
     current_price: Mapped[int]
-    # 上次價格異動幅度，於 Task 8 ingest_product 每次比對到既有商品時更新；
-    # 新商品建立時為 None。用於 Task 17 搜尋條件「最近漲價/降價/漲跌幅」，
-    # 避免每次搜尋都要對全表逐筆計算統計。
-    last_change_amount: Mapped[int | None] = mapped_column(default=None)
-    last_change_percent: Mapped[float | None] = mapped_column(default=None)
     is_active: Mapped[bool] = mapped_column(default=True)
     first_seen_at: Mapped[datetime.datetime]
     last_seen_at: Mapped[datetime.datetime]

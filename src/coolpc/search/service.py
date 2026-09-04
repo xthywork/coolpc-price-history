@@ -16,9 +16,6 @@ class SearchFilters:
     min_price: int | None = None
     max_price: int | None = None
     is_active: bool | None = None
-    recent_change: str | None = None  # "up" | "down" | None
-    min_change_percent: float | None = None
-    max_change_percent: float | None = None
     sort: str = "last_seen_desc"
     limit: int = 50
     offset: int = 0
@@ -91,14 +88,6 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
         query = query.filter(Product.current_price <= filters.max_price)
     if filters.is_active is not None:
         query = query.filter(Product.is_active == filters.is_active)
-    if filters.recent_change == "up":
-        query = query.filter(Product.last_change_amount > 0)
-    elif filters.recent_change == "down":
-        query = query.filter(Product.last_change_amount < 0)
-    if filters.min_change_percent is not None:
-        query = query.filter(Product.last_change_percent >= filters.min_change_percent)
-    if filters.max_change_percent is not None:
-        query = query.filter(Product.last_change_percent <= filters.max_change_percent)
 
     total = query.count()
     if filters.sort == "category_asc":

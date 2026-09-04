@@ -3,7 +3,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
-from coolpc.query_types import OptionalInt, OptionalFloat, OptionalBool, OptionalDatetime
+from coolpc.query_types import OptionalInt, OptionalBool, OptionalDatetime
 from coolpc.public_api import schemas
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products, search_products_and
@@ -43,9 +43,6 @@ def list_products(
     min_price: OptionalInt = None,
     max_price: OptionalInt = None,
     is_active: OptionalBool = None,
-    recent_change: str | None = None,
-    min_change_percent: OptionalFloat = None,
-    max_change_percent: OptionalFloat = None,
     sort: str = "last_seen_desc",
     limit: int = Query(default=50, le=20000),
     offset: int = 0,
@@ -54,8 +51,7 @@ def list_products(
     filters = SearchFilters(
         q=q, q_match=q_match, category_id=category_id, subcategory_id=subcategory_id, brand=brand, model=model,
         min_price=min_price, max_price=max_price, is_active=is_active,
-        recent_change=recent_change, min_change_percent=min_change_percent,
-        max_change_percent=max_change_percent, sort=sort, limit=limit, offset=offset,
+        sort=sort, limit=limit, offset=offset,
     )
     products, total = search_products(session, filters)
     items = [_to_list_item(session, p) for p in products]

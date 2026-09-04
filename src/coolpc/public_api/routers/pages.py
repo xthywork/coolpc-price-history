@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
-from coolpc.query_types import OptionalInt, OptionalFloat, OptionalBool
+from coolpc.query_types import OptionalInt, OptionalBool
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products
 from coolpc.stats.service import compute_product_stats, get_price_history
@@ -60,9 +60,6 @@ def search_page(
     min_price: OptionalInt = None,
     max_price: OptionalInt = None,
     is_active: OptionalBool = None,
-    recent_change: str | None = None,
-    min_change_percent: OptionalFloat = None,
-    max_change_percent: OptionalFloat = None,
     sort: str = "price_asc",
     page: int = 1,
     page_size: str = str(DEFAULT_PAGE_SIZE),
@@ -73,8 +70,6 @@ def search_page(
     filters = SearchFilters(
         q=q, category_id=category_id, subcategory_id=subcategory_id, brand=brand, model=model,
         min_price=min_price, max_price=max_price, is_active=is_active,
-        recent_change=recent_change, min_change_percent=min_change_percent,
-        max_change_percent=max_change_percent,
         sort=sort, limit=effective_page_size, offset=(page - 1) * effective_page_size,
     )
     products, total = search_products(session, filters)
@@ -98,8 +93,7 @@ def search_page(
         "q": q, "category_id": category_id, "subcategory_id": subcategory_id,
         "brand": brand, "model": model,
         "min_price": min_price, "max_price": max_price, "is_active": is_active,
-        "recent_change": recent_change, "min_change_percent": min_change_percent,
-        "max_change_percent": max_change_percent, "sort": sort, "page_size": page_size,
+        "sort": sort, "page_size": page_size,
     }.items() if v not in (None, "")}
 
     subcategory_rows = (
@@ -130,8 +124,7 @@ def search_page(
             "q": q or "", "category_id": category_id, "subcategory_id": subcategory_id,
             "brand": brand, "model": model,
             "min_price": min_price, "max_price": max_price, "is_active": is_active,
-            "recent_change": recent_change, "min_change_percent": min_change_percent,
-            "max_change_percent": max_change_percent, "sort": sort, "page_size": page_size,
+            "sort": sort, "page_size": page_size,
         },
         "query_string": urlencode(query_params),
         "page": page,

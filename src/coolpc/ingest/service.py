@@ -57,10 +57,6 @@ def ingest_product(
     if existing_name is not None:
         product = session.get(Product, existing_name.product_id)
         price_delta = parsed.price - product.current_price
-        product.last_change_amount = price_delta
-        product.last_change_percent = (
-            (price_delta / product.current_price * 100) if product.current_price else None
-        )
         product.current_price = parsed.price
         product.current_status = parsed.status
         product.category_id = category.id

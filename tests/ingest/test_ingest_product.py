@@ -52,8 +52,6 @@ def test_ingest_existing_product_updates_price_and_reactivates():
     assert product2.current_price == 8490
     assert product2.is_active is True
     assert product2.last_seen_at == t1
-    assert product2.last_change_amount == 500
-    assert round(product2.last_change_percent, 2) == round(500 / 7990 * 100, 2)
     assert session.query(ProductName).count() == 1  # 沒有新增歷史名稱
     assert session.query(PriceHistory).filter_by(product_id=product.id).count() == 2
 
