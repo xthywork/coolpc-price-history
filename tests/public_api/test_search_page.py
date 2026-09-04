@@ -158,6 +158,22 @@ def test_search_page_subcategory_dropdown_respects_category_sort_order():
     assert pos_a < pos_b < pos_c
 
 
+def test_search_page_dropdown_hides_trailing_slash_when_subcategory_name_is_blank():
+    # 原價屋許多分類本身沒有第二層子分類，實際資料是一筆名稱為空字串的
+    # 子分類；下拉選單只該顯示分類名稱，不能留下「分類 / 」這種空尾巴。
+    client, Session_ = _make_client()
+    with Session_() as session:
+        cat = Category(name="無子分類測試")
+        sub = Subcategory(name="", category=cat)
+        session.add_all([cat, sub])
+        session.commit()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert ">無子分類測試</option>" in resp.text
+    assert "無子分類測試 / " not in resp.text
+
+
 def test_search_page_accepts_blank_form_fields_without_422():
     # 瀏覽器送出未填的下拉選單/數字欄位時，值是空字串而非省略整個參數
     # （例如 category_id=&min_price=&is_active=&min_change_percent=），

@@ -75,7 +75,9 @@ def search_page(
         .all()
     )
     subcategories = [
-        {"id": sc.id, "label": f"{cat.label} / {sc.label}"}
+        # 原價屋許多分類本身沒有第二層子分類，實際資料庫裡是一筆名稱為空字串
+        # 的子分類；這種情況只顯示分類名稱，不要留下一個沒有內容的「 / 」。
+        {"id": sc.id, "label": f"{cat.label} / {sc.label}" if sc.label else cat.label}
         for sc, cat in subcategory_rows
     ]
 

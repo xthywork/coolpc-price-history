@@ -127,6 +127,9 @@ def test_compare_page_table_only_has_four_columns():
     assert "現價" in resp.text
     # 商品欄要佔表格一半以上寬度，不能被壓縮
     assert 'style="width:55%"' in resp.text
+    # 欄寬仍要能手動拖曳調整
+    assert "col-resizer" in resp.text
+    assert "mousedown" in resp.text
 
 
 def test_compare_page_has_color_dot_before_product_name_and_no_default_legend():

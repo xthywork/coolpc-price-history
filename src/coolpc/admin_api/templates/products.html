@@ -13,7 +13,14 @@
   <button type="submit">搜尋</button>
 </form>
 <p>共 {{ total }} 筆（僅顯示前 100 筆）</p>
-<table style="table-layout:fixed">
+<style>
+  #adminProductsTable { table-layout: fixed; }
+  #adminProductsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #adminProductsTable th .col-resizer {
+    position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
+  }
+</style>
+<table id="adminProductsTable">
   <thead><tr><th style="width:6%">ID</th><th style="width:55%">商品名稱</th><th style="width:13%">現價</th><th style="width:10%">狀態</th><th style="width:16%">最後更新</th></tr></thead>
   <tbody>
     {% for p in products %}
@@ -28,4 +35,30 @@
   </tbody>
 </table>
 <p>複製要合併的商品 ID，到 <a href="/merge">合併商品</a> 頁面操作。</p>
+
+<script>
+function makeColumnsResizable(table) {
+  table.querySelectorAll('th').forEach(th => {
+    const resizer = document.createElement('div');
+    resizer.className = 'col-resizer';
+    th.appendChild(resizer);
+    resizer.addEventListener('mousedown', (e) => {
+      const startX = e.pageX;
+      const startWidth = th.offsetWidth;
+      const onMouseMove = (e2) => {
+        th.style.width = Math.max(40, startWidth + (e2.pageX - startX)) + 'px';
+      };
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      e.preventDefault();
+    });
+  });
+}
+const adminProductsTable = document.getElementById('adminProductsTable');
+if (adminProductsTable) makeColumnsResizable(adminProductsTable);
+</script>
 {% endblock %}

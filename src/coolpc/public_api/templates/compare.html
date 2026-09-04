@@ -11,7 +11,14 @@
 {% if error %}<p style="color:#b91c1c">{{ error }}</p>{% endif %}
 
 {% if items %}
-<table style="table-layout:fixed">
+<style>
+  #compareTable { table-layout: fixed; }
+  #compareTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #compareTable th .col-resizer {
+    position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
+  }
+</style>
+<table id="compareTable">
   <thead>
     <tr>
       <th style="width:55%">商品</th><th style="width:15%">現價</th><th style="width:15%">歷史最低</th><th style="width:15%">歷史最高</th>
@@ -113,6 +120,30 @@ document.getElementById('rangeStart').addEventListener('change', loadCustomRange
 document.getElementById('rangeEnd').addEventListener('change', loadCustomRange);
 
 loadCompareChart({});
+
+function makeColumnsResizable(table) {
+  table.querySelectorAll('th').forEach(th => {
+    const resizer = document.createElement('div');
+    resizer.className = 'col-resizer';
+    th.appendChild(resizer);
+    resizer.addEventListener('mousedown', (e) => {
+      const startX = e.pageX;
+      const startWidth = th.offsetWidth;
+      const onMouseMove = (e2) => {
+        th.style.width = Math.max(40, startWidth + (e2.pageX - startX)) + 'px';
+      };
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      e.preventDefault();
+    });
+  });
+}
+const compareTable = document.getElementById('compareTable');
+if (compareTable) makeColumnsResizable(compareTable);
 </script>
 {% endif %}
 {% endblock %}

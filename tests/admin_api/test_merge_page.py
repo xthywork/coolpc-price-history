@@ -60,6 +60,9 @@ def test_product_search_page_shows_id_and_name():
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
     # 商品名稱欄要佔表格一半以上寬度，不能被壓縮
     assert "width:55%" in resp.text
+    # 欄寬仍要能手動拖曳調整
+    assert "col-resizer" in resp.text
+    assert "mousedown" in resp.text
 
 
 def test_merge_form_success_then_undo_flow():

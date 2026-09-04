@@ -61,6 +61,28 @@ def test_product_detail_page_renders_history_and_chart():
     assert "18,990" in resp.text  # 歷史價格列表出現舊價格
 
 
+def test_product_detail_page_hides_trailing_slash_when_subcategory_name_is_blank():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="無子分類測試分類")
+        sub = Subcategory(name="", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p = Product(category_id=cat.id, subcategory_id=sub.id, current_name="無子分類測試商品",
+                    current_price=1000, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add(p)
+        session.flush()
+        session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+        pid = p.id
+
+    resp = client.get(f"/products/{pid}")
+    assert resp.status_code == 200
+    assert "分類：無子分類測試分類　狀態" in resp.text
+    assert "無子分類測試分類 / " not in resp.text
+
+
 def test_product_detail_page_404_for_missing():
     client, _ = _make_client()
     resp = client.get("/products/999")
