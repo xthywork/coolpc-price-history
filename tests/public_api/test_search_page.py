@@ -235,6 +235,25 @@ def test_search_page_recent_change_select_removed_and_sort_options_reduced():
     assert 'value="status_active_first"' in resp.text
 
 
+def test_search_page_price_inputs_moved_last_to_own_row_with_auto_submit():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # 最低/最高價格排在其他欄位之後
+    pos_sort = resp.text.find('name="sort"')
+    pos_min_price = resp.text.find('id="minPriceInput"')
+    pos_max_price = resp.text.find('id="maxPriceInput"')
+    assert pos_sort != -1 and pos_min_price != -1 and pos_max_price != -1
+    assert pos_sort < pos_min_price < pos_max_price
+    # 搜尋按鈕在第一行（價格欄位之前），只送出第一行欄位仍在同一個 form 內
+    pos_button = resp.text.find(">搜尋<")
+    assert pos_button != -1
+    assert pos_button < pos_min_price
+    # 價格欄位變動要自動送出表單（動態更新下方列表），不需要按搜尋
+    assert "minPriceInput" in resp.text and "addEventListener" in resp.text
+    assert "searchFiltersForm" in resp.text
+
+
 def test_base_layout_has_compare_clear_control():
     # 「清空比較清單」連結已搬到 /compare 頁面本身（見 test_compare_page.py），
     # base.html（所有頁面共用）不應該再有這個控制項；coolpcCompare.clear() 方法本身仍保留。

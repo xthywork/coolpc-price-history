@@ -8,17 +8,17 @@
 <form method="post" action="/merge">
   <p>
     來源商品（將被合併，舊名稱仍可搜尋）：<br>
-    <input type="text" id="sourceSearch" placeholder="輸入商品名稱搜尋...">
+    <input type="text" name="source_id" id="sourceInput" placeholder="輸入商品 ID 或名稱..."
+           autocomplete="off" pattern="[0-9]+" title="請直接輸入商品 ID，或輸入名稱後從清單中點選一項" required>
     <div id="sourceResults"></div>
-    <span id="sourceSelected"></span><br>
-    或直接輸入商品ID（備用）：<input type="number" name="source_id" id="sourceId" required>
+    <span id="sourceSelected"></span>
   </p>
   <p>
     目標商品（合併後保留的主商品，請選擇目前仍持續更新的商品）：<br>
-    <input type="text" id="targetSearch" placeholder="輸入商品名稱搜尋...">
+    <input type="text" name="target_id" id="targetInput" placeholder="輸入商品 ID 或名稱..."
+           autocomplete="off" pattern="[0-9]+" title="請直接輸入商品 ID，或輸入名稱後從清單中點選一項" required>
     <div id="targetResults"></div>
-    <span id="targetSelected"></span><br>
-    或直接輸入商品ID（備用）：<input type="number" name="target_id" id="targetId" required>
+    <span id="targetSelected"></span>
   </p>
   <button type="submit">合併</button>
 </form>
@@ -46,16 +46,16 @@
 </table>
 
 <script>
-function setupProductSearch(searchInputId, resultsId, idFieldId, selectedId) {
-  const searchInput = document.getElementById(searchInputId);
+function setupProductSearch(inputId, resultsId, selectedId) {
+  const input = document.getElementById(inputId);
   const results = document.getElementById(resultsId);
-  const idField = document.getElementById(idFieldId);
   const selected = document.getElementById(selectedId);
   let timer;
-  searchInput.addEventListener('input', () => {
+  input.addEventListener('input', () => {
     clearTimeout(timer);
-    const q = searchInput.value.trim();
-    if (!q) { results.innerHTML = ''; return; }
+    const q = input.value.trim();
+    // 純數字視為直接輸入 ID，不需要（也不該）觸發名稱搜尋建議清單
+    if (!q || /^[0-9]+$/.test(q)) { results.innerHTML = ''; selected.textContent = ''; return; }
     timer = setTimeout(async () => {
       const resp = await fetch(`/products/search-json?q=${encodeURIComponent(q)}`);
       const items = await resp.json();
@@ -67,17 +67,16 @@ function setupProductSearch(searchInputId, resultsId, idFieldId, selectedId) {
         div.style.padding = '4px';
         div.style.borderBottom = '1px solid #e5e7eb';
         div.addEventListener('click', () => {
-          idField.value = item.id;
+          input.value = item.id;
           selected.textContent = `已選擇：${item.name} (#${item.id})`;
           results.innerHTML = '';
-          searchInput.value = '';
         });
         results.appendChild(div);
       });
     }, 300);
   });
 }
-setupProductSearch('sourceSearch', 'sourceResults', 'sourceId', 'sourceSelected');
-setupProductSearch('targetSearch', 'targetResults', 'targetId', 'targetSelected');
+setupProductSearch('sourceInput', 'sourceResults', 'sourceSelected');
+setupProductSearch('targetInput', 'targetResults', 'targetSelected');
 </script>
 {% endblock %}

@@ -1,36 +1,53 @@
 {% extends "base.html" %}
 {% block title %}商品搜尋 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
-<form class="filters" method="get" action="/">
-  <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}">
-  <select name="subcategory_id">
-    <option value="">全部分類</option>
-    {% for sc in subcategories %}
-    <option value="{{ sc.id }}" {% if query.subcategory_id == sc.id %}selected{% endif %}>{{ sc.label }}</option>
-    {% endfor %}
-  </select>
-  <select name="brand">
-    <option value="">全部品牌</option>
-    {% for b in brands %}
-    <option value="{{ b }}" {% if query.brand == b %}selected{% endif %}>{{ b }}</option>
-    {% endfor %}
-  </select>
-  <input type="number" name="min_price" placeholder="最低價格" value="{{ query.min_price or '' }}">
-  <input type="number" name="max_price" placeholder="最高價格" value="{{ query.max_price or '' }}">
-  <select name="is_active">
-    <option value="">在售/下架</option>
-    <option value="true" {% if query.is_active == True %}selected{% endif %}>僅在售</option>
-    <option value="false" {% if query.is_active == False %}selected{% endif %}>僅下架</option>
-  </select>
-  <select name="sort">
-    <option value="price_asc" {% if query.sort == "price_asc" %}selected{% endif %}>價格低到高</option>
-    <option value="price_desc" {% if query.sort == "price_desc" %}selected{% endif %}>價格高到低</option>
-    <option value="brand_asc" {% if query.sort == "brand_asc" %}selected{% endif %}>品牌</option>
-    <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
-    <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
-  </select>
-  <button type="submit">搜尋</button>
+<form class="filters" method="get" action="/" id="searchFiltersForm" style="display:block;">
+  <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+    <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}">
+    <select name="subcategory_id">
+      <option value="">全部分類</option>
+      {% for sc in subcategories %}
+      <option value="{{ sc.id }}" {% if query.subcategory_id == sc.id %}selected{% endif %}>{{ sc.label }}</option>
+      {% endfor %}
+    </select>
+    <select name="brand">
+      <option value="">全部品牌</option>
+      {% for b in brands %}
+      <option value="{{ b }}" {% if query.brand == b %}selected{% endif %}>{{ b }}</option>
+      {% endfor %}
+    </select>
+    <select name="is_active">
+      <option value="">在售/下架</option>
+      <option value="true" {% if query.is_active == True %}selected{% endif %}>僅在售</option>
+      <option value="false" {% if query.is_active == False %}selected{% endif %}>僅下架</option>
+    </select>
+    <select name="sort">
+      <option value="price_asc" {% if query.sort == "price_asc" %}selected{% endif %}>價格低到高</option>
+      <option value="price_desc" {% if query.sort == "price_desc" %}selected{% endif %}>價格高到低</option>
+      <option value="brand_asc" {% if query.sort == "brand_asc" %}selected{% endif %}>品牌</option>
+      <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
+      <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
+    </select>
+    <button type="submit" style="margin-left:auto;">搜尋</button>
+  </div>
+  <div style="display:flex; gap:8px; margin-top:8px;">
+    <input type="number" name="min_price" id="minPriceInput" placeholder="最低價格" value="{{ query.min_price or '' }}">
+    <input type="number" name="max_price" id="maxPriceInput" placeholder="最高價格" value="{{ query.max_price or '' }}">
+  </div>
 </form>
+<script>
+(function () {
+  let priceDebounce;
+  function autoSubmitPriceFilter() {
+    clearTimeout(priceDebounce);
+    priceDebounce = setTimeout(() => {
+      document.getElementById('searchFiltersForm').submit();
+    }, 600);
+  }
+  document.getElementById('minPriceInput').addEventListener('input', autoSubmitPriceFilter);
+  document.getElementById('maxPriceInput').addEventListener('input', autoSubmitPriceFilter);
+})();
+</script>
 
 <p>共 {{ total }} 筆結果{% if last_updated %}　最後更新：{{ last_updated.strftime("%Y-%m-%d %H:%M") }}{% endif %}</p>
 

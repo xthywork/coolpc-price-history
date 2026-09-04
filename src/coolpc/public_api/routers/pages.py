@@ -147,8 +147,7 @@ def compare_page(request: Request, ids: str | None = None, session: Session = De
                     break
                 items.append({"product": product, "stats": compute_product_stats(session, pid)})
 
-    padded_items = items + [None] * (5 - len(items))
     return templates.TemplateResponse(request, "compare.html", {
-        "items": items, "padded_items": padded_items, "ids": ids or "",
+        "items": items, "ids": ids or "",
         "error": error, "colors": COMPARE_COLORS,
     })

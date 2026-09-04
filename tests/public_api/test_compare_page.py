@@ -33,17 +33,19 @@ def test_compare_page_without_ids_shows_form_only():
     assert "商品比較" in resp.text
 
 
-def test_compare_page_has_five_horizontal_search_slots_not_plain_id_textbox():
+def test_compare_page_has_single_search_input_with_chip_picker_not_plain_id_textbox():
     client, _ = _make_client()
     resp = client.get("/compare")
     assert resp.status_code == 200
-    assert resp.text.count('class="compareSlot"') == 5
-    assert resp.text.count('class="compareSlotSearch"') == 5
+    assert 'id="compareSearchInput"' in resp.text
+    assert 'id="compareChips"' in resp.text
     assert 'type="hidden" name="ids"' in resp.text
     assert "輸入商品 ID" not in resp.text
+    # 只有一個搜尋框，不是舊版的 5 個並排輸入框
+    assert resp.text.count('id="compareSearchInput"') == 1
 
 
-def test_compare_page_slots_prefill_names_not_ids_for_existing_selection():
+def test_compare_page_prefills_chips_with_names_not_ids_for_existing_selection():
     client, Session_ = _make_client()
     t = datetime.datetime(2026, 2, 1)
     with Session_() as session:
@@ -61,14 +63,15 @@ def test_compare_page_slots_prefill_names_not_ids_for_existing_selection():
 
     resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
     assert resp.status_code == 200
-    # 名稱要出現在畫面可見的區塊裡（不是只在 hidden input 的 value）
-    assert f'>下拉預填測試A</div>' in resp.text
-    assert f'>下拉預填測試B</div>' in resp.text
-    # id 只能出現在 hidden input 裡，不能是看得到的文字內容
+    # 名稱要出現在畫面可見的 chip 裡（不是只在 hidden input 的 value）
+    assert '<span class="compareChipName">下拉預填測試A</span>' in resp.text
+    assert '<span class="compareChipName">下拉預填測試B</span>' in resp.text
+    # id 只能出現在 chip 的 data-id 屬性和 hidden input 裡，不能是看得到的文字內容
     assert f'>{p1_id}<' not in resp.text
     assert f'>{p2_id}<' not in resp.text
-    assert f'class="compareSlotId" value="{p1_id}"' in resp.text
-    assert f'class="compareSlotId" value="{p2_id}"' in resp.text
+    assert f'class="compareChip" data-id="{p1_id}"' in resp.text
+    assert f'class="compareChip" data-id="{p2_id}"' in resp.text
+    assert f'id="idsHidden" value="{p1_id},{p2_id}"' in resp.text
 
 
 def test_compare_page_shows_error_for_invalid_count():

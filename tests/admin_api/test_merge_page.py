@@ -275,12 +275,17 @@ def test_merge_page_shows_more_than_50_merge_logs():
     assert resp.text.count("已合併") >= 60
 
 
-def test_merge_page_has_search_inputs_and_fallback_id_inputs():
+def test_merge_page_has_single_combined_id_or_name_inputs():
     client, _Session_ = _make_client()
     resp = client.get("/merge")
     assert resp.status_code == 200
-    assert 'id="sourceSearch"' in resp.text
-    assert 'id="targetSearch"' in resp.text
+    assert 'id="sourceInput"' in resp.text
+    assert 'id="targetInput"' in resp.text
     assert 'name="source_id"' in resp.text
     assert 'name="target_id"' in resp.text
-    assert "備用" in resp.text
+    # 舊版分離的搜尋框 + 備用 ID 框已合併成單一輸入框
+    assert 'id="sourceSearch"' not in resp.text
+    assert 'id="sourceId"' not in resp.text
+    assert "備用" not in resp.text
+    assert resp.text.count('name="source_id"') == 1
+    assert resp.text.count('name="target_id"') == 1
