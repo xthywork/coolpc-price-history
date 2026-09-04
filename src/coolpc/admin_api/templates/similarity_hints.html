@@ -1,71 +1,61 @@
 {% extends "base.html" %}
-{% block title %}合併商品 - 原價屋管理介面{% endblock %}
+{% block title %}合併建議 - 原價屋管理介面{% endblock %}
 {% block content %}
-<h1>合併商品</h1>
-{% if message %}<p style="color:#15803d">{{ message }}</p>{% endif %}
-<form method="post" action="/similarity-hints/refresh">
-  <button type="submit">重新計算相似度候選</button>
-</form>
-<p>以下為系統依名稱相似度找出的候選。勾選後可合併（自動以仍在上架中、或最近更新較新的商品當保留的主商品），或忽略（標記為不是同一商品，之後不再出現）。</p>
-<style>
-  .hintGroup {
-    display: flex; align-items: stretch; gap: 12px;
-    border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 14px;
-    margin-bottom: 10px; background: #fff;
-  }
-  .hintGroupCheckbox { display: flex; align-items: center; }
-  .hintGroupCheckbox input { width: 18px; height: 18px; cursor: pointer; }
-  .hintGroupProducts { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-  .hintProductRow { display: flex; align-items: baseline; gap: 8px; }
-  .hintProductLabel {
-    font-size: 11px; font-weight: 700; color: #6366f1; width: 18px; flex-shrink: 0;
-    border: 1px solid #c7d2fe; border-radius: 4px; text-align: center; line-height: 16px;
-  }
-  .hintProductName { font-size: 14px; word-break: break-word; }
-  .hintProductInactive { color: #9ca3af; font-size: 12px; flex-shrink: 0; }
-  .hintDivider { border-top: 1px dashed #e5e7eb; }
-  .hintScore {
-    flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    min-width: 64px; padding-left: 12px; border-left: 1px solid #e5e7eb;
-  }
-  .hintScoreValue { font-size: 20px; font-weight: 700; color: #4f46e5; line-height: 1.2; }
-  .hintScoreLabel { font-size: 11px; color: #9ca3af; }
-</style>
+
+<div class="page-head">
+  <h1>合併建議</h1>
+  <span class="page-head__count">{{ rows|length }} 組候選</span>
+  <div class="page-head__end">
+    <form method="post" action="/similarity-hints/refresh">
+      <button type="submit">重新計算候選</button>
+    </form>
+  </div>
+</div>
+
+{% if message %}<p class="notice notice--ok">{{ message }}</p>{% endif %}
+
+<p>依名稱相似度找出的候選。合併時自動保留仍在上架、或最近更新較新的那一個當主商品；忽略代表這兩個不是同一個商品，之後不再出現。</p>
+
 <form method="post" id="hintsForm">
-  <button type="submit" formaction="/similarity-hints/batch-merge">合併</button>
-  <button type="submit" formaction="/similarity-hints/batch-dismiss">忽略</button>
-  <button type="submit" formaction="/similarity-hints/batch-merge" id="mergeAllBtn">合併下列所有項目</button>
-  <div style="margin-top:10px;">
-    {% for row in rows %}
-    <div class="hintGroup">
-      <div class="hintGroupCheckbox">
-        <input type="checkbox" name="hint_ids" value="{{ row.hint.id }}">
+  <div class="range-bar">
+    <button type="submit" formaction="/similarity-hints/batch-merge" data-variant="primary">合併勾選的</button>
+    <button type="submit" formaction="/similarity-hints/batch-dismiss">忽略勾選的</button>
+    <button type="submit" formaction="/similarity-hints/batch-merge" id="mergeAllBtn">合併全部候選</button>
+  </div>
+
+  {% for row in rows %}
+  <div class="hint">
+    <div class="hint__pick">
+      <input type="checkbox" name="hint_ids" value="{{ row.hint.id }}" aria-label="選取這組候選">
+    </div>
+    <div class="hint__pair">
+      <div class="hint__row">
+        <span class="hint__tag">A</span>
+        <span class="hint__name"><span class="id">#{{ row.a.id }}</span>{{ row.a.current_name }}</span>
+        {% if not row.a.is_active %}<span class="hint__off">已下架</span>{% endif %}
       </div>
-      <div class="hintGroupProducts">
-        <div class="hintProductRow">
-          <span class="hintProductLabel">A</span>
-          <span class="hintProductName">#{{ row.a.id }} {{ row.a.current_name }}</span>
-          {% if not row.a.is_active %}<span class="hintProductInactive">（已下架）</span>{% endif %}
-        </div>
-        <div class="hintDivider"></div>
-        <div class="hintProductRow">
-          <span class="hintProductLabel">B</span>
-          <span class="hintProductName">#{{ row.b.id }} {{ row.b.current_name }}</span>
-          {% if not row.b.is_active %}<span class="hintProductInactive">（已下架）</span>{% endif %}
-        </div>
-      </div>
-      <div class="hintScore">
-        <span class="hintScoreValue">{{ "%.0f"|format(row.hint.score * 100) }}%</span>
-        <span class="hintScoreLabel">相似度</span>
+      <div class="hint__sep"></div>
+      <div class="hint__row">
+        <span class="hint__tag">B</span>
+        <span class="hint__name"><span class="id">#{{ row.b.id }}</span>{{ row.b.current_name }}</span>
+        {% if not row.b.is_active %}<span class="hint__off">已下架</span>{% endif %}
       </div>
     </div>
-    {% endfor %}
+    <div class="hint__score">
+      <span class="hint__score-value">{{ "%.0f"|format(row.hint.score * 100) }}</span>
+      <span class="hint__score-label">相似度 %</span>
+    </div>
   </div>
+  {% endfor %}
+
+  {% if not rows %}
+  <div class="empty">目前沒有待處理的候選。按「重新計算候選」重新掃描一次。</div>
+  {% endif %}
 </form>
 
 <script>
 document.getElementById('mergeAllBtn').addEventListener('click', (e) => {
-  const checkboxes = document.querySelectorAll('.hintGroupCheckbox input');
+  const checkboxes = document.querySelectorAll('.hint__pick input');
   if (!checkboxes.length) { e.preventDefault(); return; }
   const ok = confirm(`確定要合併下列所有 ${checkboxes.length} 組候選嗎？合併後仍可在下方的合併紀錄個別 Undo。`);
   if (!ok) { e.preventDefault(); return; }

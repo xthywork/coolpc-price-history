@@ -1,0 +1,112 @@
+/* 兩個 app 共用的設計 token。顏色只承載訊息：紅漲、綠跌（台股慣例）、
+   銅金代表可互動與當前狀態，其餘一切由中性灰承擔。 */
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/static/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/static/fonts/IBMPlexMono-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  --bg: #ecedef;
+  --surface: #ffffff;
+  --surface-sunk: #f5f6f7;
+  --ink: #14161a;
+  --muted: #6b7076;
+  --line: #dcdde0;
+  --line-strong: #c3c5ca;
+  --accent: #8a6a1e;
+  --accent-soft: rgba(138, 106, 30, 0.12);
+  --up: #c0362c;
+  --down: #1b7a4b;
+  --flat: #8b9098;
+
+  /* 多商品比較的類別色。順序固定、不循環，兩個主題各自選過步階，通過
+     對比與色覺缺陷分辨度檢查（見 scripts 驗證：CVD ΔE 皆過門檻）。 */
+  --series-1: #2a78d6;
+  --series-2: #e87ba4;
+  --series-3: #eda100;
+  --series-4: #4a3aa7;
+  --series-5: #1baf7a;
+
+  /* 中文與敘述文字用系統字體；等寬字只負責需要對齊的英數字串 */
+  --font-text: -apple-system, BlinkMacSystemFont, "PingFang TC",
+    "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.375rem;
+  --step-3: 1.875rem;
+  --step-4: 2.75rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 40px;
+
+  --radius: 2px;
+  --measure: 68ch;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #12161f;
+  --surface: #181d28;
+  --surface-sunk: #141924;
+  --ink: #e6e8ec;
+  --muted: #8b93a1;
+  --line: #262d3a;
+  --line-strong: #38414f;
+  --accent: #c9a227;
+  --accent-soft: rgba(201, 162, 39, 0.16);
+  --up: #e5544a;
+  --down: #35b87a;
+  --flat: #6f7889;
+
+  --series-1: #3987e5;
+  --series-2: #d55181;
+  --series-3: #c98500;
+  --series-4: #9085e9;
+  --series-5: #199e70;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #12161f;
+    --surface: #181d28;
+    --surface-sunk: #141924;
+    --ink: #e6e8ec;
+    --muted: #8b93a1;
+    --line: #262d3a;
+    --line-strong: #38414f;
+    --accent: #c9a227;
+    --accent-soft: rgba(201, 162, 39, 0.16);
+    --up: #e5544a;
+    --down: #35b87a;
+    --flat: #6f7889;
+
+  --series-1: #3987e5;
+  --series-2: #d55181;
+  --series-3: #c98500;
+  --series-4: #9085e9;
+  --series-5: #199e70;
+  }
+}

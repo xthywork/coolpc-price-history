@@ -57,7 +57,7 @@ def test_product_detail_page_renders_history_and_chart():
     assert "ASUS RTX 5070 v2" in resp.text
     assert "ASUS RTX 5070" in resp.text  # 舊名稱要顯示
     assert 'id="priceChart"' in resp.text
-    assert "chart.js" in resp.text.lower()
+    assert "/static/js/vendor/chart.umd.min.js" in resp.text
     assert "18,990" in resp.text  # 歷史價格列表出現舊價格
 
 
@@ -79,7 +79,7 @@ def test_product_detail_page_hides_trailing_slash_when_subcategory_name_is_blank
 
     resp = client.get(f"/products/{pid}")
     assert resp.status_code == 200
-    assert "分類：無子分類測試分類　狀態" in resp.text
+    assert "<span>無子分類測試分類</span>" in resp.text
     assert "無子分類測試分類 / " not in resp.text
 
 
@@ -141,7 +141,8 @@ def test_product_detail_price_table_shows_only_current_high_low_change():
     assert "30 天最低" not in resp.text
     assert "90 天最低" not in resp.text
     assert "歷史最低" in resp.text
-    assert "漲跌" in resp.text
+    assert "歷史最高" in resp.text
+    assert "較前次抓取" in resp.text
 
 
 def test_product_detail_chart_has_no_apply_button_and_uses_change_listener():
@@ -185,7 +186,8 @@ def test_product_detail_compare_checkbox_replaces_same_category_dropdown():
 
     resp = client.get(f"/products/{product_id}")
     assert resp.status_code == 200
-    assert 'id="compareCheckbox"' in resp.text
+    assert 'id="compareToggle"' in resp.text
+    assert "加入比較" in resp.text
     assert 'id="compareAdd"' not in resp.text
     assert "addCompare(" not in resp.text
 

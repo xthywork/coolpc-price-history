@@ -1,0 +1,250 @@
+/* 管理介面：同一組 token，但更緊湊、密度更高。狀態色是它唯一額外的色彩
+   預算 —— 這是工具，不是展示品。 */
+
+body { font-size: var(--step--1); }
+
+.site-header { background: var(--surface-sunk); }
+.site-header__brand::after {
+  content: "管理";
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  padding: 0 4px;
+  margin-left: var(--space-2);
+  vertical-align: 2px;
+}
+
+main { max-width: 1320px; }
+
+th, td { padding: 6px var(--space-3); }
+.page-head h1 { font-size: var(--step-1); }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.toolbar input[type="text"] { flex: 1; min-width: 200px; }
+
+/* 抓取狀態 */
+.status {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.status-success { color: var(--down); }
+.status-failed { color: var(--up); }
+.status-partial { color: var(--accent); }
+
+.delta-up { color: var(--up); }
+.delta-down { color: var(--down); }
+.zero { color: var(--muted); }
+
+/* 商品編輯 */
+.edit-grid {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  max-width: 720px;
+}
+.edit-grid label { color: var(--muted); }
+.edit-grid input, .edit-grid select { width: 100%; }
+.edit-grid__actions { grid-column: 2; display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* 合併建議 */
+.merge-pair {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.merge-pair__score {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+.merge-pair__names { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--space-3); align-items: center; }
+.merge-pair__arrow { color: var(--muted); font-family: var(--font-mono); }
+.merge-pair__actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+
+.notice {
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.notice--error { border-left-color: var(--up); }
+.notice--ok { border-left-color: var(--down); }
+
+.archive-frame {
+  width: 100%;
+  height: 78vh;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.raw-html {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  max-height: 640px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* 合併建議：一組候選是一個橫向單位，相似度分數固定在右側 */
+.hint {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+}
+.hint__pick { display: flex; align-items: center; }
+.hint__pick input { width: 17px; height: 17px; cursor: pointer; accent-color: var(--accent); }
+.hint__pair { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.hint__row { display: flex; align-items: baseline; gap: var(--space-2); }
+.hint__tag {
+  flex-shrink: 0;
+  width: 17px;
+  text-align: center;
+  line-height: 15px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+}
+.hint__name { word-break: break-word; }
+.hint__name .id { font-family: var(--font-mono); color: var(--muted); margin-right: 5px; }
+.hint__off { color: var(--muted); font-size: 0.78rem; flex-shrink: 0; }
+.hint__sep { border-top: 1px dashed var(--line); }
+.hint__score {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--line);
+}
+.hint__score-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-2);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--accent);
+}
+.hint__score-label { font-size: 0.7rem; color: var(--muted); }
+
+/* 商品詳細：檢視用定義列表，編輯用同一組欄位 */
+.detail-list {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin: 0 0 var(--space-4);
+  max-width: 720px;
+}
+.detail-list dt { color: var(--muted); }
+.detail-list dd { margin: 0; }
+.detail-list dd.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+#adminProductsTable { table-layout: fixed; }
+#adminProductsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#adminProductsTable th .col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+}
+#adminProductsTable td { overflow: hidden; text-overflow: ellipsis; }
+
+/* 手動合併的兩個候選：被標記為「保留」的那個用左側色條標出來 */
+.merge-picks { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); max-width: 640px; }
+.merge-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+.merge-pick.is-target { border-left-color: var(--accent); }
+.merge-pick__target {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--muted);
+  cursor: pointer;
+}
+.merge-pick.is-target .merge-pick__target { color: var(--accent); }
+.merge-pick__radio { accent-color: var(--accent); cursor: pointer; }
+.merge-pick__name { flex: 1; min-width: 0; word-break: break-word; }
+.merge-pick__remove { border: none; background: none; color: var(--muted); padding: 0 2px; }
+.merge-pick__remove:hover { color: var(--up); border: none; }
+
+.picker__hint--error { color: var(--up); }
+.id-tag { font-family: var(--font-mono); color: var(--muted); margin-right: 6px; }
+
+/* 挑選器在管理介面也用得到，樣式與公開頁一致 */
+.picker { position: relative; max-width: 640px; }
+.picker input[type="text"] { width: 100%; padding: 8px var(--space-3); }
+.picker__results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 20;
+}
+.picker__results div { padding: 7px var(--space-3); cursor: pointer; }
+.picker__results div + div { border-top: 1px solid var(--line); }
+.picker__results div.is-active, .picker__results div:hover { background: var(--accent-soft); }
+.picker__hint { color: var(--muted); margin: var(--space-2) 0 var(--space-3); min-height: 1.2em; }

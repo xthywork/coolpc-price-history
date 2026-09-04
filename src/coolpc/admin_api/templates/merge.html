@@ -1,66 +1,59 @@
 {% extends "base.html" %}
 {% block title %}手動合併 - 原價屋管理介面{% endblock %}
 {% block content %}
-<h1>手動合併</h1>
-{% if message %}<p style="color:#15803d">{{ message }}</p>{% endif %}
-{% if error %}<p style="color:#b91c1c">{{ error }}</p>{% endif %}
 
-<style>
-  #mergePickerBox { position: relative; max-width: 640px; }
-  #mergeSearchInput { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
-  #mergeChips { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-width: 640px; }
-  .mergeChip {
-    display: flex; align-items: center; gap: 10px;
-    background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 8px 10px;
-  }
-  .mergeChipName { white-space: normal; word-break: break-word; font-size: 13px; line-height: 1.3; flex: 1; }
-  .mergeChipRemove { cursor: pointer; color: #6366f1; font-weight: bold; flex-shrink: 0; }
-  .mergeChipRemove:hover { color: #ef4444; }
-  .mergeChipTargetLabel { font-size: 12px; color: #374151; display: flex; align-items: center; gap: 4px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
-  #mergeSearchResults {
-    position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
-    background: #fff; border: 1px solid #d1d5db; border-radius: 6px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.12); max-height: 260px; overflow-y: auto; z-index: 20;
-  }
-  #mergeSearchResults div { padding: 8px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-  #mergeSearchResults div:last-child { border-bottom: none; }
-  #mergeSearchResults div.active, #mergeSearchResults div:hover { background: #eef2ff; }
-  #mergePickerHint { font-size: 12px; color: #b91c1c; margin-top: 4px; min-height: 1em; }
-</style>
+<div class="page-head">
+  <h1>手動合併</h1>
+</div>
+
+{% if message %}<p class="notice notice--ok">{{ message }}</p>{% endif %}
+{% if error %}<p class="notice notice--error">{{ error }}</p>{% endif %}
+
 <form method="post" action="/merge" id="mergeForm">
-  <p>搜尋並選擇兩個要合併的商品，再標記其中一個為合併後保留的目標商品：</p>
-  <div id="mergePickerBox">
-    <input type="text" id="mergeSearchInput" placeholder="搜尋商品名稱加入（最多 2 個，可用上下鍵選擇、Enter 加入）..." autocomplete="off">
-    <div id="mergeSearchResults" hidden></div>
+  <p>選兩個要合併的商品，再標記其中一個為合併後保留的主要商品。</p>
+  <div class="picker" id="mergePickerBox">
+    <input type="text" id="mergeSearchInput" placeholder="搜尋商品名稱加入，最多 2 個" autocomplete="off">
+    <div class="picker__results" id="mergeSearchResults" hidden></div>
   </div>
-  <div id="mergeChips"></div>
-  <p id="mergePickerHint"></p>
+  <div class="merge-picks" id="mergeChips"></div>
+  <p class="picker__hint picker__hint--error" id="mergePickerHint"></p>
   <input type="hidden" name="source_id" id="sourceIdHidden">
   <input type="hidden" name="target_id" id="targetIdHidden">
-  <button type="submit">合併</button>
+  <button type="submit" data-variant="primary">合併這兩個商品</button>
 </form>
 
 <h2>合併紀錄</h2>
-<table>
-  <thead><tr><th>時間</th><th>來源</th><th>目標</th><th>狀態</th><th>操作</th></tr></thead>
-  <tbody>
-    {% for row in log_rows %}
-    <tr>
-      <td>{{ row.log.merged_at.strftime("%Y-%m-%d %H:%M") }}</td>
-      <td>{{ row.source.current_name if row.source else "?" }} (#{{ row.log.source_product_id }})</td>
-      <td>{{ row.target.current_name if row.target else "?" }} (#{{ row.log.target_product_id }})</td>
-      <td>{{ "已復原" if row.log.undone_at else "已合併" }}</td>
-      <td>
-        {% if not row.log.undone_at %}
-        <form method="post" action="/merge/{{ row.log.id }}/undo" style="display:inline">
-          <button type="submit">Undo</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:150px">時間</th>
+        <th>來源（併入）</th>
+        <th>目標（保留）</th>
+        <th style="width:90px">狀態</th>
+        <th style="width:90px">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in log_rows %}
+      <tr>
+        <td class="mono">{{ row.log.merged_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td><span class="id-tag">#{{ row.log.source_product_id }}</span>{{ row.source.current_name if row.source else "（找不到）" }}</td>
+        <td><span class="id-tag">#{{ row.log.target_product_id }}</span>{{ row.target.current_name if row.target else "（找不到）" }}</td>
+        <td>{{ "已復原" if row.log.undone_at else "已合併" }}</td>
+        <td>
+          {% if not row.log.undone_at %}
+          <form method="post" action="/merge/{{ row.log.id }}/undo">
+            <button type="submit">復原</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not log_rows %}<div class="empty">還沒有合併紀錄。</div>{% endif %}
+</div>
 
 <script>
 (function () {
@@ -77,43 +70,46 @@
   let debounceTimer;
 
   function currentIds() {
-    return Array.from(chipsBox.querySelectorAll('.mergeChip')).map(el => parseInt(el.dataset.id, 10));
+    return Array.from(chipsBox.querySelectorAll('.merge-pick')).map(el => parseInt(el.dataset.id, 10));
   }
 
   function syncHidden() {
-    const chips = Array.from(chipsBox.querySelectorAll('.mergeChip'));
-    const targetChip = chips.find(c => c.querySelector('.mergeChipTargetRadio').checked);
+    const chips = Array.from(chipsBox.querySelectorAll('.merge-pick'));
+    const targetChip = chips.find(c => c.querySelector('.merge-pick__radio').checked);
     const sourceChip = chips.find(c => c !== targetChip);
     targetHidden.value = targetChip ? targetChip.dataset.id : '';
     sourceHidden.value = sourceChip ? sourceChip.dataset.id : '';
+    chips.forEach(c => {
+      c.classList.toggle('is-target', c === targetChip);
+    });
   }
 
   function wireChip(chip) {
-    chip.querySelector('.mergeChipRemove').addEventListener('click', () => {
+    chip.querySelector('.merge-pick__remove').addEventListener('click', () => {
       chip.remove();
       syncHidden();
       hint.textContent = '';
     });
-    chip.querySelector('.mergeChipTargetRadio').addEventListener('change', syncHidden);
+    chip.querySelector('.merge-pick__radio').addEventListener('change', syncHidden);
   }
 
   function addChip(id, name) {
     if (currentIds().includes(id)) return;
     if (currentIds().length >= MAX_CHIPS) {
-      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品（來源＋目標）。`;
+      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品（來源與目標各一個）。`;
       return;
     }
     const chip = document.createElement('div');
-    chip.className = 'mergeChip';
+    chip.className = 'merge-pick';
     chip.dataset.id = id;
     chip.innerHTML =
-      '<label class="mergeChipTargetLabel">' +
-        '<input type="radio" name="mergeTargetChoice" class="mergeChipTargetRadio">' +
-        '主要' +
+      '<label class="merge-pick__target">' +
+        '<input type="radio" name="mergeTargetChoice" class="merge-pick__radio">' +
+        '保留這個' +
       '</label>' +
-      '<span class="mergeChipName"></span>' +
-      '<span class="mergeChipRemove" title="移除">✕</span>';
-    chip.querySelector('.mergeChipName').textContent = name;
+      '<span class="merge-pick__name"></span>' +
+      '<button type="button" class="merge-pick__remove" title="移除" aria-label="移除">✕</button>';
+    chip.querySelector('.merge-pick__name').textContent = name;
     chipsBox.appendChild(chip);
     wireChip(chip);
     syncHidden();
@@ -129,9 +125,9 @@
 
   function highlight(index) {
     const children = resultsBox.querySelectorAll('div');
-    children.forEach(c => c.classList.remove('active'));
+    children.forEach(c => c.classList.remove('is-active'));
     if (index >= 0 && index < children.length) {
-      children[index].classList.add('active');
+      children[index].classList.add('is-active');
       children[index].scrollIntoView({ block: 'nearest' });
     }
     activeIndex = index;
@@ -144,7 +140,7 @@
     if (!items.length) { resultsBox.hidden = true; return; }
     items.forEach((item) => {
       const div = document.createElement('div');
-      div.textContent = `${item.name}（$${item.price}${item.is_active ? '' : '・已下架'}）`;
+      div.textContent = `${item.name}（${item.price.toLocaleString()}${item.is_active ? '' : '，已下架'}）`;
       div.addEventListener('click', () => {
         addChip(item.id, item.name);
         searchInput.value = '';
@@ -161,7 +157,7 @@
     const q = searchInput.value.trim();
     if (!q) { closeResults(); return; }
     if (currentIds().length >= MAX_CHIPS) {
-      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品（來源＋目標）。`;
+      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品（來源與目標各一個）。`;
       closeResults();
       return;
     }
@@ -202,10 +198,10 @@
     syncHidden();
     if (!sourceHidden.value || !targetHidden.value) {
       e.preventDefault();
-      hint.textContent = '請選擇兩個商品，並標記其中一個為保留的目標商品。';
+      hint.textContent = '請選兩個商品，並標記其中一個為保留的主要商品。';
     } else if (sourceHidden.value === targetHidden.value) {
       e.preventDefault();
-      hint.textContent = '來源與目標商品不可相同。';
+      hint.textContent = '來源與目標商品不能是同一個。';
     }
   });
 })();

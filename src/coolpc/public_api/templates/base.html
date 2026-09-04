@@ -4,27 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}原價屋歷史價格查詢{% endblock %}</title>
-  <style>
-    body { font-family: -apple-system, "Segoe UI", "微軟正黑體", sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
-    header { background: #1f2937; color: #fff; padding: 12px 20px; display: flex; gap: 20px; align-items: center; }
-    header a { color: #fff; text-decoration: none; font-weight: 600; }
-    main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
-    th { background: #f1f5f9; }
-    .up { color: #b91c1c; }
-    .down { color: #15803d; }
-    .inactive { color: #9ca3af; }
-    form.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; background: #fff; padding: 12px; border-radius: 6px; }
-    form.filters input, form.filters select { padding: 6px; }
-    .pagination { margin-top: 16px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 16px; }
-    a { color: #2563eb; }
-  </style>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/public.css">
+  <link rel="preload" href="/static/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <!-- 主題必須在畫面繪製前決定，否則深色使用者會先看到一閃的亮色頁面 -->
+  <script src="/static/js/theme.js"></script>
 </head>
-<body>
-<header>
-  <a href="/">商品搜尋</a>
-  <a href="/compare" id="compareNavLink">商品比較</a>
+<body{% block body_attrs %}{% endblock %}>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="site-header__brand" href="/">原價屋歷史價格</a>
+    <nav class="site-nav">
+      <a href="/" {% if request.url.path == "/" %}aria-current="page"{% endif %}>搜尋</a>
+      <a href="/compare" id="compareNavLink" {% if request.url.path == "/compare" %}aria-current="page"{% endif %}>比較</a>
+    </nav>
+    <div class="site-header__end">
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="切換主題">☾</button>
+    </div>
+  </div>
 </header>
 <script>
 window.coolpcCompare = {
@@ -67,7 +65,7 @@ window.coolpcCompare = {
     const link = document.getElementById('compareNavLink');
     if (!link) return;
     const ids = this._read();
-    link.textContent = ids.length ? `商品比較 (${ids.length})` : '商品比較';
+    link.textContent = ids.length ? `比較 ${ids.length}` : '比較';
     link.href = ids.length ? `/compare?ids=${ids.join(',')}` : '/compare';
   },
 };

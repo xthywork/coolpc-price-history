@@ -40,7 +40,7 @@ def test_dashboard_shows_recent_snapshots():
     resp = client.get("/")
     assert resp.status_code == 200
     assert "success" in resp.text
-    assert "5000" in resp.text
+    assert "5,000" in resp.text
 
 
 def test_manual_scrape_triggers_run_scrape_and_redirects(monkeypatch):

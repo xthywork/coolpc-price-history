@@ -1,45 +1,83 @@
 {% extends "base.html" %}
 {% block title %}{{ product.current_name }} - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
-<h1>{{ product.current_name }}
-  <label style="font-size:14px;font-weight:normal;margin-left:12px;">
-    <input type="checkbox" id="compareCheckbox"> 加入比較
-  </label>
-</h1>
-<p>分類：{{ category.label }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}　狀態：{{ "在售" if product.is_active else "已下架" }}</p>
-<p>歷史名稱：{{ historical_names | join("、") }}</p>
-<p>第一次出現：{{ product.created_at.strftime("%Y-%m-%d %H:%M") }}　最後一次出現：{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</p>
 
-<table>
-  <tr><th>目前價格</th><td>${{ "{:,}".format(product.current_price) }}</td></tr>
-  <tr><th>歷史最低 / 最高</th><td>${{ "{:,}".format(stats.all_time_low) }} / ${{ "{:,}".format(stats.all_time_high) }}</td></tr>
-  <tr><th>漲跌</th><td>{% if stats.change_amount %}{{ "%+d"|format(stats.change_amount) }} ({{ "%.1f"|format(stats.change_percent) }}%){% else %}-{% endif %}</td></tr>
-</table>
+<div class="product-head">
+  <h1>{{ product.current_name }}</h1>
+  <div class="product-meta">
+    <span>{{ category.label }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}</span>
+    <span>{{ "在售中" if product.is_active else "已下架" }}</span>
+    <span>首次出現 <span class="mono">{{ product.created_at.strftime("%Y-%m-%d") }}</span></span>
+    <span>最後出現 <span class="mono">{{ product.last_seen_at.strftime("%Y-%m-%d %H:%M") }}</span></span>
+    <button type="button" id="compareToggle" aria-pressed="false">加入比較</button>
+  </div>
+</div>
+
+<div class="price-block">
+  <div>
+    <div class="price-now"><span class="price-now__currency">NT$</span>{{ "{:,}".format(product.current_price) }}</div>
+    <div class="price-change {% if stats.change_amount and stats.change_amount > 0 %}up{% elif stats.change_amount and stats.change_amount < 0 %}down{% else %}flat{% endif %}">
+      {%- if stats.change_amount %}
+        {{ "▲ +" if stats.change_amount > 0 else "▼ −" }}{{ "{:,}".format(stats.change_amount|abs) }}
+        {{ "%.1f"|format(stats.change_percent|abs) }}%　較前次抓取
+      {%- else -%}
+        價格與前次抓取相同
+      {%- endif %}
+    </div>
+  </div>
+  <div class="price-facts">
+    <div class="price-facts__item">
+      <span class="price-facts__label">歷史最低</span>
+      <span class="price-facts__value down">{{ "{:,}".format(stats.all_time_low) }}</span>
+    </div>
+    <div class="price-facts__item">
+      <span class="price-facts__label">歷史最高</span>
+      <span class="price-facts__value up">{{ "{:,}".format(stats.all_time_high) }}</span>
+    </div>
+  </div>
+</div>
+
+{% if historical_names|length > 1 %}
+<p class="product-meta">曾用名稱：{{ historical_names | join("、") }}</p>
+{% endif %}
 
 <h2>價格走勢</h2>
-<div>
-  <button data-range="7">7天</button>
-  <button data-range="30">30天</button>
-  <button data-range="90">90天</button>
-  <button data-range="all">全部</button>
-  自訂：<input type="date" id="rangeStart"> ~ <input type="date" id="rangeEnd">
+<div class="range-bar">
+  <button type="button" data-range="7">7 天</button>
+  <button type="button" data-range="30" aria-pressed="true">30 天</button>
+  <button type="button" data-range="90">90 天</button>
+  <button type="button" data-range="all">全部</button>
+  <span class="range-bar__custom">
+    <label for="rangeStart">自訂</label>
+    <input type="date" id="rangeStart">
+    <span>到</span>
+    <input type="date" id="rangeEnd">
+  </span>
 </div>
-<canvas id="priceChart" height="100"></canvas>
+<div class="chart-box">
+  <canvas id="priceChart" height="110"></canvas>
+</div>
 
-<h2>歷史價格列表</h2>
-<table>
-  <thead><tr><th>時間</th><th>價格</th></tr></thead>
-  <tbody>
-    {% for h in history %}
-    <tr><td>{{ h.scraped_at.strftime("%Y-%m-%d %H:%M") }}</td><td>${{ "{:,}".format(h.price) }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<h2>歷史價格</h2>
+<div class="table-wrap history-table">
+  <table>
+    <thead><tr><th>抓取時間</th><th class="col-num">價格</th></tr></thead>
+    <tbody>
+      {% for h in history %}
+      <tr><td class="mono">{{ h.scraped_at.strftime("%Y-%m-%d %H:%M") }}</td><td class="col-num">{{ "{:,}".format(h.price) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not history %}<div class="empty">這個商品還沒有價格記錄。</div>{% endif %}
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/static/js/vendor/chart.umd.min.js"></script>
+<script src="/static/js/chart-theme.js"></script>
 <script>
 const productId = {{ product.id }};
 let priceChart;
+
+function seriesColor(theme) { return theme.accent; }
 
 async function loadPrices(params) {
   const url = new URL(`/api/products/${productId}/prices`, window.location.origin);
@@ -48,29 +86,58 @@ async function loadPrices(params) {
   }
   const resp = await fetch(url);
   const data = await resp.json();
-  const labels = data.map(d => d.scraped_at);
+  const labels = data.map(d => d.scraped_at.replace('T', ' ').slice(0, 16));
   const prices = data.map(d => d.price);
   if (priceChart) {
     priceChart.data.labels = labels;
     priceChart.data.datasets[0].data = prices;
     priceChart.update();
-  } else {
-    const ctx = document.getElementById('priceChart').getContext('2d');
-    priceChart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: labels, datasets: [{ label: '價格 (TWD)', data: prices, borderColor: '#2563eb', fill: false }] },
-      options: {
-        scales: {
-          x: { title: { display: true, text: '日期 / 時間' } },
-          y: { title: { display: true, text: '價格 TWD' } },
+    return;
+  }
+  const theme = window.coolpcChartTheme.applyDefaults(Chart);
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '價格',
+        data: prices,
+        borderColor: seriesColor(theme),
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        tension: 0,
+        fill: false,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => 'NT$ ' + item.parsed.y.toLocaleString(),
+          },
         },
       },
-    });
-  }
+      scales: {
+        x: { grid: { color: theme.line }, ticks: { color: theme.muted, maxTicksLimit: 8 } },
+        y: {
+          grid: { color: theme.line },
+          ticks: { color: theme.muted, callback: (v) => v.toLocaleString() },
+        },
+      },
+    },
+  });
 }
 
 document.querySelectorAll('button[data-range]').forEach(btn => {
   btn.addEventListener('click', () => {
+    document.querySelectorAll('button[data-range]').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+    document.getElementById('rangeStart').value = '';
+    document.getElementById('rangeEnd').value = '';
     const range = btn.dataset.range;
     loadPrices(range === 'all' ? {} : { days: range });
   });
@@ -80,6 +147,7 @@ function loadCustomRange() {
   const startVal = document.getElementById('rangeStart').value;
   const endVal = document.getElementById('rangeEnd').value;
   if (!startVal && !endVal) return;
+  document.querySelectorAll('button[data-range]').forEach(b => b.setAttribute('aria-pressed', 'false'));
   // <input type=date> 只給日期，結束日要補到當天 23:59:59 才不會漏掉當天資料
   loadPrices({
     start: startVal ? `${startVal}T00:00:00` : '',
@@ -89,15 +157,25 @@ function loadCustomRange() {
 document.getElementById('rangeStart').addEventListener('change', loadCustomRange);
 document.getElementById('rangeEnd').addEventListener('change', loadCustomRange);
 
-const compareCheckbox = document.getElementById('compareCheckbox');
-compareCheckbox.checked = window.coolpcCompare.has(productId);
-compareCheckbox.addEventListener('change', () => {
-  if (compareCheckbox.checked) {
-    const added = window.coolpcCompare.add(productId);
-    if (!added) { compareCheckbox.checked = false; }
-  } else {
+document.addEventListener('coolpc:themechange', () => {
+  window.coolpcChartTheme.applyDefaults(Chart);
+  window.coolpcChartTheme.repaint(priceChart, seriesColor);
+});
+
+const compareToggle = document.getElementById('compareToggle');
+function paintCompareToggle() {
+  const inList = window.coolpcCompare.has(productId);
+  compareToggle.setAttribute('aria-pressed', inList ? 'true' : 'false');
+  compareToggle.textContent = inList ? '已在比較清單' : '加入比較';
+}
+paintCompareToggle();
+compareToggle.addEventListener('click', () => {
+  if (window.coolpcCompare.has(productId)) {
     window.coolpcCompare.remove(productId);
+  } else {
+    window.coolpcCompare.add(productId);
   }
+  paintCompareToggle();
 });
 
 loadPrices({ days: 30 });

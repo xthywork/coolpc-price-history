@@ -1,28 +1,47 @@
 {% extends "base.html" %}
 {% block title %}抓取狀態 - 原價屋管理介面{% endblock %}
 {% block content %}
-<h1>抓取狀態</h1>
-<form method="post" action="/scrape">
-  <button type="submit">手動執行抓取</button>
-</form>
-<table>
-  <thead>
-    <tr><th>估價時間</th><th>類型</th><th>狀態</th><th>商品總數</th><th>新商品</th><th>下架</th><th>漲價</th><th>降價</th><th>錯誤訊息</th></tr>
-  </thead>
-  <tbody>
-    {% for s in snapshots %}
-    <tr>
-      <td>{{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}</td>
-      <td>{{ s.scrape_type }}</td>
-      <td class="status-{{ s.status }}">{{ s.status }}</td>
-      <td>{{ s.total_products }}</td>
-      <td>{{ s.new_products }}</td>
-      <td>{{ s.delisted_products }}</td>
-      <td>{{ s.price_up_count }}</td>
-      <td>{{ s.price_down_count }}</td>
-      <td>{{ s.error_message or "" }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<div class="page-head">
+  <h1>抓取狀態</h1>
+  <div class="page-head__end">
+    <form method="post" action="/scrape">
+      <button type="submit" data-variant="primary">立即抓取一次</button>
+    </form>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>估價時間</th>
+        <th>類型</th>
+        <th>狀態</th>
+        <th class="col-num">商品總數</th>
+        <th class="col-num">新增</th>
+        <th class="col-num">下架</th>
+        <th class="col-num">漲價</th>
+        <th class="col-num">降價</th>
+        <th>錯誤訊息</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in snapshots %}
+      <tr>
+        <td class="mono">{{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ s.scrape_type }}</td>
+        <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
+        <td class="col-num">{{ "{:,}".format(s.total_products) }}</td>
+        <td class="col-num {{ 'zero' if not s.new_products }}">{{ s.new_products }}</td>
+        <td class="col-num {{ 'zero' if not s.delisted_products }}">{{ s.delisted_products }}</td>
+        <td class="col-num {{ 'delta-up' if s.price_up_count else 'zero' }}">{{ s.price_up_count }}</td>
+        <td class="col-num {{ 'delta-down' if s.price_down_count else 'zero' }}">{{ s.price_down_count }}</td>
+        <td>{{ s.error_message or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not snapshots %}<div class="empty">還沒有抓取記錄。按「立即抓取一次」開始。</div>{% endif %}
+</div>
 {% endblock %}

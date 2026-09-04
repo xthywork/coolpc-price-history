@@ -40,7 +40,10 @@ public_api（0.0.0.0:33690）      admin_api（0.0.0.0:33691）
 - 兩個服務各自是獨立的 FastAPI app、獨立的 uvicorn 進程、共用同一個 SQLite
   資料庫檔案，皆不需要登入。
 - 前端一律是 Jinja2 伺服端渲染 + 原生 JavaScript，**刻意不使用任何前端框架**
-  （React/Vue 等）。
+  （React/Vue 等），也沒有任何建置流程。共用的 CSS、字體與少量原生 JS 放在
+  `src/coolpc/web/static/`，兩個服務各自 mount 到 `/static`，外觀由一組
+  CSS 變數（token）統一控制，支援跟隨系統的明暗主題。第三方資產（IBM Plex
+  Mono 字體、Chart.js）一律 self-host，不依賴外部 CDN。
 - ORM 為 SQLAlchemy 2.0（`Mapped[...]` 型別註記風格），schema 演進透過
   Alembic migration 管理，不使用 `create_all` 讓正式環境自動長欄位。
 
@@ -244,6 +247,7 @@ src/coolpc/
   query_types.py       把空字串正規化成 None 的 Pydantic 查詢參數型別
   public_api/           公開服務：FastAPI app、routers、templates、schemas
   admin_api/             管理介面：FastAPI app、routers、templates
+  web/static/           兩個服務共用的前端資產（CSS token、字體、原生 JS）
   cli.py                coolpc-scraper 命令列工具
 deploy/                 systemd unit 檔案（抓取排程、兩個常駐服務）
 data/                   SQLite 資料庫與永久保存的原始 HTML（不納入版控）

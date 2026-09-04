@@ -1,0 +1,257 @@
+/* 公開查詢頁。第一眼是搜尋列與今日異動，因為價格追蹤最有代表性的一刻
+   就是「今天有什麼變便宜了」。 */
+
+.search-head {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.search-head__row { display: flex; gap: var(--space-2); }
+.search-head__row input[type="text"] {
+  flex: 1;
+  font-size: var(--step-1);
+  padding: 10px var(--space-3);
+}
+.search-head__row button { padding-inline: var(--space-4); }
+
+/* 今日異動：數字取自最新一筆抓取快照 */
+.pulse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.pulse__item { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.pulse__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: var(--step-1);
+  color: var(--ink);
+}
+.pulse__value.up { color: var(--up); }
+.pulse__value.down { color: var(--down); }
+.pulse__stamp { font-family: var(--font-mono); color: var(--muted); }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.filters__price { display: flex; align-items: center; gap: var(--space-1); }
+.filters__price input { width: 92px; }
+.filters__price span { color: var(--muted); font-size: var(--step--1); }
+
+.result-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--step--1);
+  color: var(--muted);
+  max-width: none;
+}
+.result-line strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ── 搜尋結果表 ─────────────────────────────────────────── */
+
+.results th, .results td { padding-block: 7px; }
+.results .col-spark { width: 96px; padding-inline: var(--space-2); }
+.results .col-price { width: 104px; }
+.results .col-change { width: 108px; }
+.results .col-pick { width: 40px; text-align: center; }
+.results tbody td:first-child { padding-left: var(--space-3); }
+.results .name { display: block; line-height: 1.35; }
+.results .cat { color: var(--muted); font-size: 0.78rem; }
+.results .badge-low {
+  color: var(--down);
+  font-size: 0.72rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  padding: 0 4px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.spark { display: block; width: 88px; height: 22px; }
+.spark__line { fill: none; stroke: var(--flat); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.spark--up .spark__line { stroke: var(--up); }
+.spark--down .spark__line { stroke: var(--down); }
+
+/* ── 商品詳細頁：價格是主角 ─────────────────────────────── */
+
+.product-head { margin-bottom: var(--space-5); }
+.product-head h1 { margin-bottom: var(--space-2); max-width: 42ch; }
+.product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--step--1);
+  color: var(--muted);
+  max-width: none;
+}
+.product-meta .mono { color: var(--ink); }
+
+.price-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+}
+.price-now {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-4);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.price-now__currency { font-size: var(--step-1); color: var(--muted); margin-right: 4px; }
+.price-change { font-family: var(--font-mono); font-size: var(--step-1); }
+.price-facts { display: flex; gap: var(--space-5); margin-left: auto; }
+.price-facts__item { display: flex; flex-direction: column; gap: 2px; }
+.price-facts__label { font-size: 0.78rem; color: var(--muted); }
+.price-facts__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-1);
+}
+
+.range-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.range-bar__custom { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; font-size: var(--step--1); color: var(--muted); }
+.chart-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.history-table { max-height: 420px; overflow-y: auto; }
+
+@media (max-width: 720px) {
+  .price-facts { margin-left: 0; width: 100%; }
+  .results .col-spark { display: none; }
+}
+
+
+/* ── 比較頁 ─────────────────────────────────────────────── */
+
+.compare-empty { text-align: center; padding: var(--space-6) var(--space-4); color: var(--muted); }
+.compare-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--chip-color, var(--accent));
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 5px var(--space-2) 5px var(--space-3);
+  font-size: var(--step--1);
+}
+.compare-chip button { border: none; background: none; color: var(--muted); padding: 0 2px; line-height: 1; }
+.compare-chip button:hover { color: var(--up); }
+
+.results .cat { display: block; color: var(--muted); font-size: 0.78rem; }
+.results .col-change { white-space: nowrap; }
+
+/* 欄寬可拖曳（沿用改版前就有的行為） */
+#resultsTable { table-layout: fixed; }
+#resultsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#resultsTable th .col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+}
+#resultsTable td { overflow: hidden; }
+#resultsTable td:first-child { text-overflow: ellipsis; }
+
+/* ── 比較頁的商品挑選器 ─────────────────────────────────── */
+
+.picker { position: relative; max-width: 640px; }
+.picker input[type="text"] { width: 100%; font-size: var(--step-0); padding: 9px var(--space-3); }
+.picker__results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 20;
+}
+.picker__results div {
+  padding: 7px var(--space-3);
+  cursor: pointer;
+  font-size: var(--step--1);
+}
+.picker__results div + div { border-top: 1px solid var(--line); }
+.picker__results div.is-active, .picker__results div:hover { background: var(--accent-soft); }
+.picker__hint { font-size: var(--step--1); color: var(--muted); margin: var(--space-2) 0 0; min-height: 1.2em; }
+
+.series-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  margin-right: var(--space-2);
+  vertical-align: 1px;
+}
+.series-1 { background: var(--series-1); }
+.series-2 { background: var(--series-2); }
+.series-3 { background: var(--series-3); }
+.series-4 { background: var(--series-4); }
+.series-5 { background: var(--series-5); }
+.compare-chip { border-left-width: 3px; border-left-style: solid; }
+.compare-chip.series-1 { background: var(--surface); border-left-color: var(--series-1); }
+.compare-chip.series-2 { background: var(--surface); border-left-color: var(--series-2); }
+.compare-chip.series-3 { background: var(--surface); border-left-color: var(--series-3); }
+.compare-chip.series-4 { background: var(--surface); border-left-color: var(--series-4); }
+.compare-chip.series-5 { background: var(--surface); border-left-color: var(--series-5); }
+
+#compareTable { table-layout: fixed; }
+#compareTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#compareTable th .col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* 手機上固定欄寬會把商品名壓成一字一行。改讓瀏覽器自己分配寬度，並把走勢
+   與漲跌讓出去——商品名讀不出來的話，整列都沒有意義。 */
+@media (max-width: 640px) {
+  #resultsTable { table-layout: auto; }
+  #resultsTable td { overflow: visible; }
+  .results .col-change { display: none; }
+  .results .col-price { width: auto; }
+  .results th, .results td { padding-inline: var(--space-2); }
+}

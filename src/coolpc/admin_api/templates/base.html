@@ -4,27 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}原價屋管理介面{% endblock %}</title>
-  <style>
-    body { font-family: -apple-system, "Segoe UI", "微軟正黑體", sans-serif; margin: 0; background: #f7f7f8; color: #1a1a1a; }
-    header { background: #111827; color: #fff; padding: 12px 20px; display: flex; gap: 20px; }
-    header a { color: #fff; text-decoration: none; font-weight: 600; }
-    main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; word-break: break-all; }
-    th { background: #f1f5f9; }
-    .status-success { color: #15803d; }
-    .status-failed { color: #b91c1c; }
-    .status-partial { color: #d97706; }
-    button { padding: 6px 12px; cursor: pointer; }
-  </style>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+  <link rel="preload" href="/static/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <script src="/static/js/theme.js"></script>
 </head>
 <body>
-<header>
-  <a href="/">抓取狀態</a>
-  <a href="/html-archive">原始 HTML</a>
-  <a href="/products">商品搜尋</a>
-  <a href="/similarity-hints">合併商品</a>
-  <a href="/merge">手動合併</a>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="site-header__brand" href="/">原價屋</a>
+    <nav class="site-nav">
+      <a href="/" {% if request.url.path == "/" %}aria-current="page"{% endif %}>抓取狀態</a>
+      <a href="/products" {% if request.url.path.startswith("/products") %}aria-current="page"{% endif %}>商品</a>
+      <a href="/similarity-hints" {% if request.url.path.startswith("/similarity-hints") %}aria-current="page"{% endif %}>合併建議</a>
+      <a href="/merge" {% if request.url.path.startswith("/merge") %}aria-current="page"{% endif %}>手動合併</a>
+      <a href="/html-archive" {% if request.url.path.startswith("/html-archive") %}aria-current="page"{% endif %}>原始 HTML</a>
+    </nav>
+    <div class="site-header__end">
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="切換主題">☾</button>
+    </div>
+  </div>
 </header>
 <main>
 {% block content %}{% endblock %}

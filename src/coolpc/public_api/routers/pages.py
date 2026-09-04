@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from coolpc.public_api.dependencies import get_session, get_visible_product, _is_visible
 from coolpc.query_types import OptionalInt, OptionalBool
-from coolpc.db.models import Category, Subcategory, Product, ProductName
+from coolpc.db.models import Category, Subcategory, Product, ProductName, ScrapeSnapshot
 from coolpc.search.service import SearchFilters, search_products
 from coolpc.stats.service import compute_product_stats, get_price_history
 
@@ -20,7 +20,6 @@ DEFAULT_PAGE_SIZE = 20
 # 而是用一個遠超過實際商品總數的大數字模擬「不分頁」，不需要改動共用的
 # search_products() 邏輯。
 _ALL_PAGE_SIZE_LIMIT = 100_000
-COMPARE_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"]
 
 
 def _resolve_page_size(page_size: str) -> tuple[str, int]:
@@ -115,8 +114,18 @@ def search_page(
         .order_by(Product.brand).all()
     ]
 
+    # 搜尋頁開頭的「今日異動」直接用最新一筆抓取快照上現成的計數欄位，
+    # 不另外掃描 price_history，所以這段是零額外查詢成本。
+    latest_snapshot = (
+        session.query(ScrapeSnapshot)
+        .filter(ScrapeSnapshot.status.in_(("success", "partial")))
+        .order_by(ScrapeSnapshot.fetched_at.desc())
+        .first()
+    )
+
     return templates.TemplateResponse(request, "search.html", {
         "rows": rows,
+        "latest_snapshot": latest_snapshot,
         "categories": session.query(Category).order_by(Category.sort_order.asc().nulls_last(), Category.name).all(),
         "subcategories": subcategories,
         "brands": brands,
@@ -180,5 +189,5 @@ def compare_page(request: Request, ids: str | None = None, session: Session = De
 
     return templates.TemplateResponse(request, "compare.html", {
         "items": items, "ids": ids or "",
-        "error": error, "colors": COMPARE_COLORS,
+        "error": error,
     })

@@ -66,13 +66,13 @@ def test_compare_page_prefills_chips_with_names_not_ids_for_existing_selection()
     resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
     assert resp.status_code == 200
     # 名稱要出現在畫面可見的 chip 裡（不是只在 hidden input 的 value）
-    assert '<span class="compareChipName">下拉預填測試A</span>' in resp.text
-    assert '<span class="compareChipName">下拉預填測試B</span>' in resp.text
+    assert '<span class="compare-chip__name">下拉預填測試A</span>' in resp.text
+    assert '<span class="compare-chip__name">下拉預填測試B</span>' in resp.text
     # id 只能出現在 chip 的 data-id 屬性和 hidden input 裡，不能是看得到的文字內容
     assert f'>{p1_id}<' not in resp.text
     assert f'>{p2_id}<' not in resp.text
-    assert f'class="compareChip" data-id="{p1_id}"' in resp.text
-    assert f'class="compareChip" data-id="{p2_id}"' in resp.text
+    assert f'class="compare-chip series-1" data-id="{p1_id}"' in resp.text
+    assert f'class="compare-chip series-2" data-id="{p2_id}"' in resp.text
     assert f'id="idsHidden" value="{p1_id},{p2_id}"' in resp.text
 
 
@@ -168,8 +168,9 @@ def test_compare_page_table_only_has_four_columns():
     assert "歷史最低" in resp.text
     assert "歷史最高" in resp.text
     assert "現價" in resp.text
-    # 商品欄要佔表格一半以上寬度，不能被壓縮
-    assert 'style="width:55%"' in resp.text
+    # 商品欄是唯一沒設固定寬度的欄，數字欄各佔 120px，剩下的寬度全歸商品名
+    assert "<th>商品</th>" in resp.text
+    assert resp.text.count('style="width:120px"') == 3
     # 欄寬仍要能手動拖曳調整
     assert "col-resizer" in resp.text
     assert "mousedown" in resp.text
@@ -195,7 +196,9 @@ def test_compare_page_has_color_dot_before_product_name_and_no_default_legend():
     assert resp.status_code == 200
     assert "legend" in resp.text and "display: false" in resp.text.replace('"', '').replace("'", "")
     assert "colors[loop.index0" not in resp.text  # 不應該有殘留的 Jinja 語法字面文字
-    assert resp.text.count("background:") >= 2 or resp.text.count("background-color:") >= 2
+    # 色點顏色由 --series-N token 決定，兩個商品各拿到自己的槽位
+    assert 'class="series-swatch series-1"' in resp.text
+    assert 'class="series-swatch series-2"' in resp.text
 
 
 def test_compare_page_chart_has_range_controls_and_no_apply_button():
@@ -245,7 +248,7 @@ def test_compare_page_has_clear_link_and_base_html_no_longer_does():
     resp = client.get("/compare", params={"ids": f"{p1_id},{p2_id}"})
     assert resp.status_code == 200
     assert "coolpcCompare.clear()" in resp.text
-    assert "清空比較清單" in resp.text
+    assert "清空清單" in resp.text
 
     home = client.get("/")
     assert 'id="compareClearLink"' not in home.text
@@ -259,4 +262,4 @@ def test_compare_page_has_clear_link_and_base_html_no_longer_does():
     # cap-at-5 + clear-list 設計初衷）。
     bad = client.get("/compare", params={"ids": f"{p1_id},{p2_id},999999999"})
     assert bad.status_code == 200
-    assert "清空比較清單" in bad.text
+    assert "清空清單" in bad.text
