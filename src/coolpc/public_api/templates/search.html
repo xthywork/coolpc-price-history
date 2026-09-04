@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block title %}商品搜尋 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
+<script>
+// 改變「每頁顯示幾筆」會整頁 reload；還原成上次操作時的捲動位置，而不是
+// 每次都跳回最上面。放在內容最前面盡早執行，減少畫面先跳頂再跳回去的閃爍。
+(function () {
+  try {
+    const savedScroll = sessionStorage.getItem('coolpc_search_scroll');
+    if (savedScroll !== null) {
+      sessionStorage.removeItem('coolpc_search_scroll');
+      window.scrollTo(0, parseInt(savedScroll, 10));
+    }
+  } catch (e) {}
+})();
+</script>
 <form class="filters" method="get" action="/" id="searchFiltersForm" style="display:block;">
   <div style="display:flex; gap:8px; align-items:center;">
     <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}" style="flex:1; min-width:200px;">
@@ -139,6 +152,7 @@ if (jumpPageInput) {
 const pageSizeSelect = document.getElementById('pageSizeSelect');
 if (pageSizeSelect) {
   pageSizeSelect.addEventListener('change', () => {
+    try { sessionStorage.setItem('coolpc_search_scroll', String(window.scrollY)); } catch (e) {}
     document.getElementById('searchFiltersForm').submit();
   });
 }

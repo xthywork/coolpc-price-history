@@ -374,6 +374,26 @@ def test_search_page_keyword_input_wide_button_beside_it_dropdowns_on_next_row()
     assert ".submit()" not in resp.text[autoupdate_start:autoupdate_end]
 
 
+def test_search_page_preserves_scroll_position_across_page_size_change():
+    client, _Session_ = _make_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # 改變每頁筆數時，先把目前捲動位置存到 sessionStorage，再送出表單
+    change_start = resp.text.find("pageSizeSelect.addEventListener('change'")
+    change_end = resp.text.find("});", change_start)
+    assert change_start != -1 and change_end != -1
+    handler_body = resp.text[change_start:change_end]
+    assert "sessionStorage.setItem('coolpc_search_scroll'" in handler_body
+    assert "window.scrollY" in handler_body
+    assert ".submit()" in handler_body
+    # 頁面一開始（在其餘內容之前）就要嘗試還原捲動位置，而不是預設留在頂端
+    restore_pos = resp.text.find("sessionStorage.getItem('coolpc_search_scroll')")
+    form_pos = resp.text.find('id="searchFiltersForm"')
+    assert restore_pos != -1 and form_pos != -1
+    assert restore_pos < form_pos
+    assert "window.scrollTo(0, parseInt(savedScroll, 10))" in resp.text
+
+
 def test_base_layout_has_compare_clear_control():
     # 「清空比較清單」連結已搬到 /compare 頁面本身（見 test_compare_page.py），
     # base.html（所有頁面共用）不應該再有這個控制項；coolpcCompare.clear() 方法本身仍保留。
