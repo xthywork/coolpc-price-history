@@ -13,8 +13,8 @@
   <button type="submit">搜尋</button>
 </form>
 <p>共 {{ total }} 筆（僅顯示前 100 筆）</p>
-<table>
-  <thead><tr><th>ID</th><th>商品名稱</th><th>現價</th><th>狀態</th><th>最後更新</th></tr></thead>
+<table style="table-layout:fixed">
+  <thead><tr><th style="width:6%">ID</th><th style="width:55%">商品名稱</th><th style="width:13%">現價</th><th style="width:10%">狀態</th><th style="width:16%">最後更新</th></tr></thead>
   <tbody>
     {% for p in products %}
     <tr>

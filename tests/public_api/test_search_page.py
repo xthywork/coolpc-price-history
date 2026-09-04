@@ -251,6 +251,8 @@ def test_search_page_results_table_only_has_four_columns_plus_checkbox():
     assert "商品名稱" in resp.text
     assert "分類" in resp.text
     assert "狀態" in resp.text
+    # 商品名稱欄要佔表格一半以上寬度，不能被壓縮
+    assert 'style="width:55%"' in resp.text
     assert f'data-id="{product_id}"' in resp.text
     assert 'class="compareCheckbox"' in resp.text
 

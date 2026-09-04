@@ -58,6 +58,8 @@ def test_product_search_page_shows_id_and_name():
     assert resp.status_code == 200
     assert str(source_id) in resp.text
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
+    # 商品名稱欄要佔表格一半以上寬度，不能被壓縮
+    assert "width:55%" in resp.text
 
 
 def test_merge_form_success_then_undo_flow():
