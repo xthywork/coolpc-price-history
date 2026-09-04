@@ -74,10 +74,11 @@ def test_products_page_shows_required_columns():
     pid, _, _ = _seed_product(Session_)
     resp = client.get("/products")
     assert resp.status_code == 200
-    for header in ["ID", "商品名稱", "品牌", "型號", "目前價格", "狀態", "建立時間"]:
+    for header in ["ID", "商品名稱", "品牌", "目前價格", "狀態", "建立時間"]:
         assert f">{header}<" in resp.text
     assert "ASUS" in resp.text
-    assert "RTX5070-12G" in resp.text
+    # 型號欄移除了，空間全部讓給商品名稱
+    assert ">型號<" not in resp.text
     assert "2026-02-01" in resp.text
 
 
@@ -131,6 +132,7 @@ def test_product_detail_page_shows_full_fields():
     assert f'商品 <span class="mono">#{pid}</span>' in resp.text
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
     assert "ASUS" in resp.text
+    # 詳細頁仍要看得到型號，移除的只是列表頁那一欄
     assert "RTX5070-12G" in resp.text
     assert "特價中" in resp.text
     assert "18,990" in resp.text  # 價格用等寬數字呈現，幣別由欄位標題交代

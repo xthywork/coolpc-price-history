@@ -16,14 +16,12 @@
 <div class="price-block">
   <div>
     <div class="price-now"><span class="price-now__currency">NT$</span>{{ "{:,}".format(product.current_price) }}</div>
-    <div class="price-change {% if stats.change_amount and stats.change_amount > 0 %}up{% elif stats.change_amount and stats.change_amount < 0 %}down{% else %}flat{% endif %}">
-      {%- if stats.change_amount %}
-        {{ "▲ +" if stats.change_amount > 0 else "▼ −" }}{{ "{:,}".format(stats.change_amount|abs) }}
-        {{ "%.1f"|format(stats.change_percent|abs) }}%　較前次抓取
-      {%- else -%}
-        價格與前次抓取相同
-      {%- endif %}
+    {% if stats.change_amount %}
+    <div class="price-change {{ "up" if stats.change_amount > 0 else "down" }}">
+      {{ "▲ +" if stats.change_amount > 0 else "▼ −" }}{{ "{:,}".format(stats.change_amount|abs) }}
+      {{ "%.1f"|format(stats.change_percent|abs) }}%　較前次抓取
     </div>
+    {% endif %}
   </div>
   <div class="price-facts">
     <div class="price-facts__item">
@@ -55,7 +53,7 @@
   </span>
 </div>
 <div class="chart-box">
-  <canvas id="priceChart" height="110"></canvas>
+  <canvas id="priceChart"></canvas>
 </div>
 
 <h2>歷史價格</h2>
@@ -76,6 +74,7 @@
 <script>
 const productId = {{ product.id }};
 let priceChart;
+let chartLabels = [];
 
 function seriesColor(theme) { return theme.accent; }
 
@@ -87,10 +86,13 @@ async function loadPrices(params) {
   const resp = await fetch(url);
   const data = await resp.json();
   const labels = data.map(d => d.scraped_at.replace('T', ' ').slice(0, 16));
+  chartLabels = labels;
   const prices = data.map(d => d.price);
   if (priceChart) {
     priceChart.data.labels = labels;
     priceChart.data.datasets[0].data = prices;
+    priceChart.options.scales.x.ticks.callback =
+      window.coolpcChartTheme.dateOnlyTicks(chartLabels);
     priceChart.update();
     return;
   }
@@ -117,16 +119,23 @@ async function loadPrices(params) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: (item) => 'NT$ ' + item.parsed.y.toLocaleString(),
-          },
+          enabled: false,
+          external: window.coolpcChartTheme.externalTooltip,
         },
       },
       scales: {
-        x: { grid: { color: theme.line }, ticks: { color: theme.muted, maxTicksLimit: 8 } },
+        x: {
+          grid: { color: theme.line },
+          ticks: {
+            color: theme.muted,
+            maxTicksLimit: 8,
+            callback: window.coolpcChartTheme.dateOnlyTicks(chartLabels),
+          },
+        },
         y: {
           grid: { color: theme.line },
-          ticks: { color: theme.muted, callback: (v) => v.toLocaleString() },
+          // 橫格線給少一點，圖表變高之後才不會整片都是線
+          ticks: { color: theme.muted, maxTicksLimit: 6, callback: (v) => v.toLocaleString() },
         },
       },
     },

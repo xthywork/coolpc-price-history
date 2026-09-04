@@ -5,6 +5,7 @@
 <div class="page-head">
   <h1><span class="mono">{{ snapshot.fetched_at.strftime("%Y-%m-%d %H:%M") }}</span> 的原始 HTML</h1>
   <span class="page-head__count">{{ snapshot.raw_html_path }}</span>
+  <div class="page-head__end"><a href="/">回抓取狀態</a></div>
 </div>
 
 <pre class="raw-html">{{ content }}</pre>

@@ -19,7 +19,7 @@
     {% endfor %}
   </select>
   <select name="is_active" aria-label="銷售狀態">
-    <option value="">販售中與已下架</option>
+    <option value="">販售中／已下架</option>
     <option value="true" {% if query.is_active == True %}selected{% endif %}>販售中</option>
     <option value="false" {% if query.is_active == False %}selected{% endif %}>已下架</option>
   </select>
@@ -31,9 +31,8 @@
     <thead>
       <tr>
         <th class="col-num" style="width:70px">ID</th>
-        <th style="width:36%">商品名稱</th>
+        <th>商品名稱</th>
         <th style="width:12%">品牌</th>
-        <th style="width:12%">型號</th>
         <th class="col-num" style="width:110px">目前價格</th>
         <th style="width:90px">狀態</th>
         <th style="width:178px">建立時間</th>
@@ -45,7 +44,6 @@
         <td class="col-num">{{ p.id }}</td>
         <td><a href="/products/{{ p.id }}">{{ p.current_name }}</a></td>
         <td>{{ p.brand or "" }}</td>
-        <td class="mono">{{ p.model or "" }}</td>
         <td class="col-num">{{ "{:,}".format(p.current_price) }}</td>
         <td>{{ "販售中" if p.is_active else "已下架" }}</td>
         <td class="mono">{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>

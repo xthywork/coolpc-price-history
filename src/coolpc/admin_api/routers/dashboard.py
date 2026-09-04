@@ -56,18 +56,9 @@ def trigger_scrape():
     return RedirectResponse(url="/", status_code=303)
 
 
-@router.get("/html-archive")
-def html_archive_list(request: Request, session: Session = Depends(get_session)):
-    snapshots = (
-        session.query(ScrapeSnapshot)
-        .filter(ScrapeSnapshot.raw_html_path.isnot(None))
-        .order_by(ScrapeSnapshot.created_at.desc())
-        .limit(200)
-        .all()
-    )
-    return templates.TemplateResponse(request, "html_archive_list.html", {"snapshots": snapshots})
-
-
+# 原本的 /html-archive 列表頁已移除：它列的東西跟抓取狀態頁完全重疊，只多
+# 一個檔案路徑欄位——那個路徑現在掛在抓取狀態每一列的 title 上，滑鼠停住
+# 就看得到。單筆的原始 HTML 檢視頁保留，從抓取狀態的估價時間點進去。
 @router.get("/html-archive/{snapshot_id}")
 def html_archive_view(request: Request, snapshot_id: int, session: Session = Depends(get_session)):
     snapshot = session.get(ScrapeSnapshot, snapshot_id)

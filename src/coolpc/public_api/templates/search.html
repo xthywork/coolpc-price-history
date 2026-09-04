@@ -22,7 +22,7 @@
       {% endfor %}
     </select>
     <select name="is_active" aria-label="銷售狀態">
-      <option value="">販售中與已下架</option>
+      <option value="">販售中／已下架</option>
       <option value="true" {% if query.is_active == True %}selected{% endif %}>販售中</option>
       <option value="false" {% if query.is_active == False %}selected{% endif %}>已下架</option>
     </select>

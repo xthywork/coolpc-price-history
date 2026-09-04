@@ -13,7 +13,7 @@
 </div>
 
 <div class="table-wrap">
-  <table>
+  <table class="snapshots">
     <thead>
       <tr>
         <th>估價時間</th>
@@ -29,8 +29,14 @@
     </thead>
     <tbody>
       {% for s in snapshots %}
-      <tr>
-        <td class="mono">{{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <tr {% if s.raw_html_path %}title="原始 HTML：{{ s.raw_html_path }}"{% endif %}>
+        <td class="mono">
+          {%- if s.raw_html_path -%}
+          <a href="/html-archive/{{ s.id }}">{{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}</a>
+          {%- else -%}
+          {{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}
+          {%- endif -%}
+        </td>
         <td>{{ s.scrape_type }}</td>
         <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
         <td class="col-num">{{ "{:,}".format(s.total_products) }}</td>

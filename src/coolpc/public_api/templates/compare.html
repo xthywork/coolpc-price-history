@@ -70,7 +70,7 @@
   </span>
 </div>
 <div class="chart-box">
-  <canvas id="compareChart" height="120"></canvas>
+  <canvas id="compareChart"></canvas>
 </div>
 {% elif not error %}
 <div class="empty">還沒有選擇商品。在上面搜尋兩個以上的商品，就能把它們的價格走勢疊在一起看。</div>
@@ -222,6 +222,7 @@
 const productIds = [{% for item in items %}{{ item.product.id }}{% if not loop.last %},{% endif %}{% endfor %}];
 const productNames = {{ items | map(attribute="product.current_name") | list | tojson }};
 let compareChart;
+let chartLabels = [];
 
 // 系列顏色一律從 CSS 變數讀，切換主題時整份重新取一次，圖表才會跟著換色
 function seriesColor(theme, index) {
@@ -242,6 +243,7 @@ async function loadCompareChart(params) {
   const labelSet = new Set();
   seriesList.forEach(series => series.forEach(pt => labelSet.add(pt.scraped_at)));
   const labels = Array.from(labelSet).sort();
+  chartLabels = labels.map(l => l.replace('T', ' ').slice(0, 16));
 
   const theme = window.coolpcChartTheme.applyDefaults(Chart);
   const datasets = seriesList.map((series, i) => {
@@ -260,15 +262,17 @@ async function loadCompareChart(params) {
   });
 
   if (compareChart) {
-    compareChart.data.labels = labels;
+    compareChart.data.labels = chartLabels;
     compareChart.data.datasets = datasets;
+    compareChart.options.scales.x.ticks.callback =
+      window.coolpcChartTheme.dateOnlyTicks(chartLabels);
     compareChart.update();
     return;
   }
   const ctx = document.getElementById('compareChart').getContext('2d');
   compareChart = new Chart(ctx, {
     type: 'line',
-    data: { labels: labels.map(l => l.replace('T', ' ').slice(0, 16)), datasets: datasets },
+    data: { labels: chartLabels, datasets: datasets },
     options: {
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -276,12 +280,24 @@ async function loadCompareChart(params) {
         // 商品名稱與色票已經在上面的比較表裡成對出現，那張表就是圖例
         legend: { display: false },
         tooltip: {
-          callbacks: { label: (item) => item.dataset.label + '：NT$ ' + item.parsed.y.toLocaleString() },
+          enabled: false,
+          external: window.coolpcChartTheme.externalTooltip,
         },
       },
       scales: {
-        x: { grid: { color: theme.line }, ticks: { color: theme.muted, maxTicksLimit: 8 } },
-        y: { grid: { color: theme.line }, ticks: { color: theme.muted, callback: (v) => v.toLocaleString() } },
+        x: {
+          grid: { color: theme.line },
+          ticks: {
+            color: theme.muted,
+            maxTicksLimit: 8,
+            callback: window.coolpcChartTheme.dateOnlyTicks(chartLabels),
+          },
+        },
+        y: {
+          grid: { color: theme.line },
+          // 橫格線給少一點，圖表變高之後才不會整片都是線
+          ticks: { color: theme.muted, maxTicksLimit: 6, callback: (v) => v.toLocaleString() },
+        },
       },
     },
   });

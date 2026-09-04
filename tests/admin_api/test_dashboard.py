@@ -62,7 +62,7 @@ def test_manual_scrape_triggers_run_scrape_and_redirects(monkeypatch):
     assert called["scrape_type"] == "manual"
 
 
-def test_html_archive_list_and_view(tmp_path):
+def test_dashboard_row_carries_html_path_and_links_to_the_view(tmp_path):
     client, Session_ = _make_client()
     html_path = tmp_path / "sample.html"
     html_path.write_bytes("<html>測試內容 <script>alert(1)</script></html>".encode("cp950"))
@@ -76,9 +76,15 @@ def test_html_archive_list_and_view(tmp_path):
         session.commit()
         sid = snap.id
 
-    list_resp = client.get("/html-archive")
-    assert list_resp.status_code == 200
-    assert str(html_path) in list_resp.text
+    # 原本的 /html-archive 列表頁已移除：它跟抓取狀態頁列的是同一批東西
+    assert client.get("/html-archive").status_code == 404
+    assert "/html-archive\"" not in client.get("/").text
+
+    # 檔案路徑改掛在抓取狀態那一列上，滑鼠停住就看得到；估價時間連進檢視頁
+    dashboard_resp = client.get("/")
+    assert dashboard_resp.status_code == 200
+    assert f'title="原始 HTML：{html_path}"' in dashboard_resp.text
+    assert f'href="/html-archive/{sid}"' in dashboard_resp.text
 
     view_resp = client.get(f"/html-archive/{sid}")
     assert view_resp.status_code == 200

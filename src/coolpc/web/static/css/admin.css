@@ -25,7 +25,8 @@ th, td { padding: 8px var(--space-3); }
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -248,3 +249,8 @@ th, td { padding: 8px var(--space-3); }
 .picker__results div + div { border-top: 1px solid var(--line); }
 .picker__results div.is-active, .picker__results div:hover { background: var(--accent-soft); }
 .picker__hint { color: var(--muted); margin: var(--space-2) 0 var(--space-3); min-height: 1.2em; }
+
+/* 抓取狀態的估價時間是進入原始 HTML 的唯一入口（列表頁已移除），用虛線
+   底線提示它可以點，整列的 title 則帶著檔案路徑 */
+.snapshots td a { text-decoration: underline dotted; text-underline-offset: 3px; }
+.snapshots td a:hover { text-decoration: underline solid; }

@@ -80,10 +80,11 @@
 /* ── 商品詳細頁：價格是主角 ─────────────────────────────── */
 
 .product-head { margin-bottom: var(--space-5); }
-.product-head h1 { margin-bottom: var(--space-2); max-width: 42ch; }
+.product-head h1 { margin-bottom: var(--space-2); }
 .product-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-3);
   font-size: var(--step--1);
   color: var(--muted);
@@ -121,13 +122,20 @@
   font-size: var(--step-1);
 }
 
-.range-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.range-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 .range-bar__custom { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; font-size: var(--step--1); color: var(--muted); }
 .chart-box {
+  position: relative;
+  height: 380px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: var(--space-3);
+}
+.chart-box canvas { width: 100%; height: 100%; }
+
+@media (max-width: 640px) {
+  .chart-box { height: 280px; }
 }
 
 .history-table { max-height: 420px; overflow-y: auto; }
@@ -140,7 +148,7 @@
 /* ── 比較頁 ─────────────────────────────────────────────── */
 
 .compare-empty { text-align: center; padding: var(--space-6) var(--space-4); color: var(--muted); }
-.compare-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.compare-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-5) 0 var(--space-4); }
 .compare-chip {
   display: inline-flex;
   align-items: center;

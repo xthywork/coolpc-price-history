@@ -19,7 +19,6 @@
       <a href="/products" {% if request.url.path.startswith("/products") %}aria-current="page"{% endif %}>商品</a>
       <a href="/similarity-hints" {% if request.url.path.startswith("/similarity-hints") %}aria-current="page"{% endif %}>合併建議</a>
       <a href="/merge" {% if request.url.path.startswith("/merge") %}aria-current="page"{% endif %}>手動合併</a>
-      <a href="/html-archive" {% if request.url.path.startswith("/html-archive") %}aria-current="page"{% endif %}>原始 HTML</a>
     </nav>
     <div class="site-header__end">
       <button type="button" class="theme-toggle" id="themeToggle" aria-label="切換主題">☾</button>
