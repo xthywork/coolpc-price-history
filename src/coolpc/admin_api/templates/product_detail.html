@@ -18,7 +18,7 @@
 <div id="viewSection">
   <dl class="detailList">
     <dt>ID</dt><dd>{{ product.id }}</dd>
-    <dt>分類</dt><dd>{{ category.label }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}</dd>
+    <dt>分類</dt><dd>{{ category.name }}{% if subcategory.label %} / {{ subcategory.label }}{% endif %}</dd>
     <dt>商品名稱</dt><dd>{{ product.current_name }}</dd>
     <dt>品牌</dt><dd>{{ product.brand or "-" }}</dd>
     <dt>型號</dt><dd>{{ product.model or "-" }}</dd>
@@ -42,7 +42,7 @@
     <label>分類
       <select name="category_id" id="categorySelect">
         {% for c in categories %}
-        <option value="{{ c.id }}" {% if c.id == product.category_id %}selected{% endif %}>{{ c.label }}</option>
+        <option value="{{ c.id }}" {% if c.id == product.category_id %}selected{% endif %}>{{ c.name }}</option>
         {% endfor %}
         <option value="__new__">+ 新增類別</option>
       </select>

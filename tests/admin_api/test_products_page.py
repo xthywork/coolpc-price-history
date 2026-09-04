@@ -136,6 +136,33 @@ def test_product_detail_page_shows_full_fields():
     assert "2026-02-01" in resp.text
 
 
+def test_product_detail_page_shows_raw_category_name_not_display_name():
+    # 管理後台商品詳細頁要顯示分類的「原始名稱」（Category.name），不要用
+    # 使用者自訂覆蓋過的顯示名稱（Category.display_name）——跟公開搜尋頁/
+    # 管理搜尋頁的分類下拉選單（都用 label = display_name or name）刻意不同。
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA", display_name="GPU 顯示卡")
+        session.add(cat)
+        session.flush()
+        sub = Subcategory(name="NVIDIA", category_id=cat.id)
+        session.add(sub)
+        session.flush()
+        product = Product(
+            category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070",
+            current_price=18990, is_active=True, last_seen_at=t, created_at=t,
+        )
+        session.add(product)
+        session.commit()
+        pid = product.id
+
+    resp = client.get(f"/products/{pid}")
+    assert resp.status_code == 200
+    assert "顯示卡VGA" in resp.text
+    assert "GPU 顯示卡" not in resp.text
+
+
 def test_product_detail_page_404_for_missing_product():
     client, _Session_ = _make_client()
     resp = client.get("/products/9999")
