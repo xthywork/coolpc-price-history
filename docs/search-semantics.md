@@ -44,8 +44,11 @@
 用於「從既有商品中精確挑出一個特定商品」的情境，例如：
 
 - 公開商品比較頁的搜尋加入商品（`GET /api/products/autocomplete`）
-- 管理後台手動合併頁的搜尋加入商品、相似度合併頁背後的商品查找
-  （`GET /products/search-json`）
+- 管理後台手動合併頁的搜尋加入商品（`GET /products/search-json`）
+
+相似度合併頁（`/similarity-hints`）不是文字搜尋介面，候選清單由
+`src/coolpc/matching/similarity.py` 的 `difflib` 名稱相似度比對批次產生，
+不經過本文件描述的搜尋語意。
 
 規則跟 AND 搜尋一樣（每個 token 各自命中即可，不要求連續子字串），但**沒有
 結果筆數上限**（`limit=None`）：這類情境的查詢通常已經夠精確（AND 語意本身
