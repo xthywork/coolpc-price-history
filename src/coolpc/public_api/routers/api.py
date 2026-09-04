@@ -6,7 +6,7 @@ from coolpc.public_api.dependencies import get_session, get_visible_product, _is
 from coolpc.query_types import OptionalInt, OptionalFloat, OptionalBool, OptionalDatetime
 from coolpc.public_api import schemas
 from coolpc.db.models import Category, Subcategory, Product, ProductName
-from coolpc.search.service import SearchFilters, search_products
+from coolpc.search.service import SearchFilters, search_products, search_products_and
 from coolpc.stats.service import compute_product_stats, get_price_history
 
 router = APIRouter(prefix="/api")
@@ -59,6 +59,24 @@ def list_products(
     products, total = search_products(session, filters)
     items = [_to_list_item(session, p) for p in products]
     return schemas.ProductListPage(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/products/autocomplete", response_model=schemas.ProductListPage)
+def autocomplete_products(
+    q: str = "", limit: int = Query(default=10, le=50), session: Session = Depends(get_session),
+):
+    # 精確鎖定單一商品用的自動完成端點（例如商品比較頁的搜尋加入）：空白
+    # 分隔的每個片段都要同時命中（AND），不像 /api/products 的 q 是 OR
+    # 語意——OR 是刻意保留給主搜尋頁瀏覽/篩選用的，這裡不能沿用，否則在
+    # 大量真實資料下，真正符合查詢的商品會被籠統的 OR 結果和 LIMIT 擠掉。
+    # AND 完全查無結果時（查詢字串太模糊）才退回 OR 當後備，避免完全查不到。
+    if not q.strip():
+        return schemas.ProductListPage(items=[], total=0, limit=limit, offset=0)
+    products = search_products_and(session, q, limit=limit)
+    if not products:
+        products, _total = search_products(session, SearchFilters(q=q, limit=limit))
+    items = [_to_list_item(session, p) for p in products]
+    return schemas.ProductListPage(items=items, total=len(items), limit=limit, offset=0)
 
 
 @router.get("/products/{product_id}", response_model=schemas.ProductDetail)

@@ -8,6 +8,7 @@ from coolpc.db.models import Category, Product, ProductName
 @dataclass
 class SearchFilters:
     q: str | None = None
+    q_match: str = "or"  # "or" | "and" — 空白分隔的每個片段用 OR 還是 AND 語意比對
     category_id: int | None = None
     subcategory_id: int | None = None
     brand: str | None = None
@@ -33,24 +34,44 @@ _SORT_MAP = {
 }
 
 
+def _require_all_patterns(query, session: Session, patterns: set[str]):
+    """把 query 限縮成：每個 pattern 都必須各自在該商品的某個歷史名稱
+    （ProductName）上比對到才算符合——不必是同一列，同一商品底下的不同
+    名稱列都算數。是 search_products() 的 q_match="and" 與
+    search_products_and() 共用的核心邏輯。"""
+    for pattern in patterns:
+        matched_ids = (
+            session.query(ProductName.product_id)
+            .filter(ProductName.name.like(f"%{pattern}%"))
+            .distinct()
+        )
+        query = query.filter(Product.id.in_(matched_ids))
+    return query
+
+
 def search_products(session: Session, filters: SearchFilters) -> tuple[list[Product], int]:
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
 
     if filters.q:
-        # 空白分隔的每個片段各自視為 OR 條件，同時保留整段字串本身的比對
+        # 空白分隔的每個片段，同時保留整段字串本身的比對
         # （名稱本來就含空白時，例如「RTX 5070」，仍要能整段比對到）。
         tokens = filters.q.split()
         patterns = {filters.q, *tokens}
-        matched_ids = [
-            row[0] for row in
-            session.query(ProductName.product_id)
-            .filter(or_(*[ProductName.name.like(f"%{p}%") for p in patterns]))
-            .distinct()
-            .all()
-        ]
-        if not matched_ids:
-            return [], 0
-        query = query.filter(Product.id.in_(matched_ids))
+        if filters.q_match == "and":
+            # 每個片段都必須同時命中，用於需要精確鎖定單一商品的場景
+            # （例如後台商品搜尋、商品比較的名稱自動完成）。
+            query = _require_all_patterns(query, session, patterns)
+        else:
+            matched_ids = [
+                row[0] for row in
+                session.query(ProductName.product_id)
+                .filter(or_(*[ProductName.name.like(f"%{p}%") for p in patterns]))
+                .distinct()
+                .all()
+            ]
+            if not matched_ids:
+                return [], 0
+            query = query.filter(Product.id.in_(matched_ids))
 
     if filters.category_id is not None:
         query = query.filter(Product.category_id == filters.category_id)
@@ -101,12 +122,6 @@ def search_products_and(session: Session, q: str, limit: int = 10) -> list[Produ
     tokens = q.split()
     patterns = {q, *tokens}
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
-    for pattern in patterns:
-        matched_ids = (
-            session.query(ProductName.product_id)
-            .filter(ProductName.name.like(f"%{pattern}%"))
-            .distinct()
-        )
-        query = query.filter(Product.id.in_(matched_ids))
+    query = _require_all_patterns(query, session, patterns)
     query = query.order_by(Product.last_seen_at.desc()).limit(limit)
     return query.all()

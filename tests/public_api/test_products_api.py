@@ -151,3 +151,43 @@ def test_list_products_accepts_blank_optional_query_params_without_422():
     })
     assert resp.status_code == 200
     assert resp.json()["total"] == 0
+
+
+def test_autocomplete_uses_and_semantics_not_or():
+    client, Session_ = _make_client()
+    _seed_product(Session_, "ASUS RTX 5070 PRIME 12G", 18990)
+    _seed_product(Session_, "MSI RTX 5080 GAMING 16G", 28990)
+
+    # OR 語意的 /api/products：兩個商品都含 "RTX"，OR 語意下 "RTX 5070"
+    # 兩張顯卡都會命中（"RTX" 這個 token 兩者都有）。
+    or_resp = client.get("/api/products", params={"q": "RTX 5070"})
+    assert or_resp.json()["total"] == 2
+
+    # 同樣的查詢字串，AND 語意的自動完成端點必須只精準命中真正同時包含
+    # "RTX" 和 "5070" 的那一個商品，不能像 OR 一樣把 MSI 那張也算進去
+    # （這正是自動完成要換成 AND 語意的原因：OR 在真實資料上太寬鬆，會把
+    # 真正要找的商品淹沒在大量無關結果裡）。
+    and_resp = client.get("/api/products/autocomplete", params={"q": "RTX 5070"})
+    assert and_resp.status_code == 200
+    assert and_resp.json()["total"] == 1
+    assert and_resp.json()["items"][0]["current_name"] == "ASUS RTX 5070 PRIME 12G"
+
+
+def test_autocomplete_falls_back_to_or_when_and_finds_nothing():
+    client, Session_ = _make_client()
+    _seed_product(Session_, "Synology HAT3300 4TB NAS專用碟", 6890)
+
+    # AND 語意對 "限搭 4TB" 這種查詢字串在真實資料上常常太嚴格找不到，
+    # 這裡故意用一個只有其中一個 token 會命中的查詢，驗證退回 OR 後備。
+    resp = client.get("/api/products/autocomplete", params={"q": "4TB 不存在的字串"})
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["current_name"] == "Synology HAT3300 4TB NAS專用碟"
+
+
+def test_autocomplete_empty_query_returns_empty_list():
+    client, _Session_ = _make_client()
+    resp = client.get("/api/products/autocomplete", params={"q": ""})
+    assert resp.status_code == 200
+    assert resp.json()["items"] == []
+    assert resp.json()["total"] == 0

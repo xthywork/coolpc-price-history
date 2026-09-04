@@ -20,7 +20,7 @@ def product_search(
     request: Request, q: str | None = None, category_id: OptionalInt = None,
     is_active: OptionalBool = None, session: Session = Depends(get_session),
 ):
-    filters = SearchFilters(q=q, category_id=category_id, is_active=is_active, limit=100)
+    filters = SearchFilters(q=q, q_match="and", category_id=category_id, is_active=is_active, limit=100)
     products, total = search_products(session, filters)
     return templates.TemplateResponse(request, "products.html", {
         "products": products, "total": total,

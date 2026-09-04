@@ -43,6 +43,8 @@ def test_compare_page_has_single_search_input_with_chip_picker_not_plain_id_text
     assert "輸入商品 ID" not in resp.text
     # 只有一個搜尋框，不是舊版的 5 個並排輸入框
     assert resp.text.count('id="compareSearchInput"') == 1
+    # 要用 AND 語意的自動完成端點，不是 OR 語意的 /api/products
+    assert "/api/products/autocomplete?" in resp.text
 
 
 def test_compare_page_prefills_chips_with_names_not_ids_for_existing_selection():

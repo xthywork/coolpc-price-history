@@ -65,6 +65,39 @@ def test_product_search_page_shows_id_and_name():
     assert "mousedown" in resp.text
 
 
+def test_product_search_page_uses_and_semantics_for_space_separated_query():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        p1 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="ASUS RTX 5070 PRIME 12G",
+                     current_price=18990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        p2 = Product(category_id=cat.id, subcategory_id=sub.id, current_name="MSI RTX 5080 GAMING 16G",
+                     current_price=28990, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+        session.add_all([p1, p2])
+        session.flush()
+        session.add_all([
+            ProductName(product_id=p1.id, name=p1.current_name, first_seen_at=t, last_seen_at=t),
+            ProductName(product_id=p2.id, name=p2.current_name, first_seen_at=t, last_seen_at=t),
+        ])
+        session.commit()
+
+    # "RTX 5090" 兩個字都要同時命中才算符合；沒有任何商品同時含 "RTX" 和
+    # "5090"，AND 語意應該完全查不到（OR 語意則會因為 "RTX" 命中兩張顯卡）。
+    resp = client.get("/products", params={"q": "RTX 5090"})
+    assert resp.status_code == 200
+    assert "ASUS RTX 5070 PRIME 12G" not in resp.text
+    assert "MSI RTX 5080 GAMING 16G" not in resp.text
+
+    resp2 = client.get("/products", params={"q": "RTX 5070"})
+    assert resp2.status_code == 200
+    assert "ASUS RTX 5070 PRIME 12G" in resp2.text
+    assert "MSI RTX 5080 GAMING 16G" not in resp2.text
+
+
 def test_merge_form_success_then_undo_flow():
     client, Session_ = _make_client()
     source_id, target_id = _seed_two_products(Session_)

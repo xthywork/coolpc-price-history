@@ -280,3 +280,32 @@ def test_search_sort_by_category_respects_custom_sort_order():
     assert total == 2
     # 依 sort_order（1 在前），而不是分類名稱字母順序（"A分類" 應該會先出現）
     assert [p.current_name for p in results] == ["第一分類的商品", "第二分類的商品"]
+
+
+def test_search_products_q_match_and_requires_both_words():
+    """q_match="and" 時，空白分隔的兩個字串必須同時命中，不是 OR。"""
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    _add(session, cat, sub, "MSI RTX 5080 GAMING 16G", 28990, True, t)
+    _add(session, cat, sub, "Synology DS923+", 15990, True, t)
+    session.commit()
+
+    # 用預設 OR 語意查，"RTX 5090" 應該因為 "RTX" 這個 token 命中兩張顯卡
+    or_results, or_total = search_products(session, SearchFilters(q="RTX 5090"))
+    assert or_total == 2
+
+    # 改用 AND 語意查同樣的字串，因為沒有任何商品同時包含 "RTX" 又包含
+    # "5090"，應該完全查不到（不會像 OR 語意那樣回傳兩張顯卡）
+    and_results, and_total = search_products(session, SearchFilters(q="RTX 5090", q_match="and"))
+    assert and_total == 0
+    assert and_results == []
+
+    # 兩個字串都真的同時出現在同一個商品時，AND 語意才要找到它
+    and_results2, and_total2 = search_products(session, SearchFilters(q="RTX 5070", q_match="and"))
+    assert and_total2 == 1
+    assert and_results2[0].current_name == "ASUS RTX 5070 PRIME 12G"
