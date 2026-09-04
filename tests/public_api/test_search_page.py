@@ -75,6 +75,82 @@ def test_search_page_pagination_link_preserves_query():
     assert "page=2" in resp.text
 
 
+def test_search_page_default_page_size_is_twenty_and_shown_selected():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        for i in range(25):
+            name = f"ASUS 分頁測試{i}"
+            p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
+                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+            session.add(p)
+            session.flush()
+            session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # 預設每頁 20 筆，25 筆資料應該分成 2 頁，且下拉選單要正確標示目前選的是 20
+    assert 'value="20" selected' in resp.text
+    assert resp.text.count("ASUS 分頁測試") == 20
+    assert 'id="jumpPageInput"' in resp.text
+    assert 'max="2"' in resp.text
+
+
+def test_search_page_page_size_all_shows_every_result_on_one_page():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        for i in range(25):
+            name = f"ASUS 全部顯示測試{i}"
+            p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
+                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+            session.add(p)
+            session.flush()
+            session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+
+    resp = client.get("/", params={"page_size": "all"})
+    assert resp.status_code == 200
+    assert resp.text.count("ASUS 全部顯示測試") == 25
+    assert 'value="all" selected' in resp.text
+    assert 'max="1"' in resp.text  # 全部顯示只有一頁
+
+
+def test_search_page_pagination_shows_numbered_page_links_and_jump_control():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        for i in range(45):
+            name = f"ASUS 頁碼測試{i}"
+            p = Product(category_id=cat.id, subcategory_id=sub.id, current_name=name,
+                        current_price=1000 + i, is_active=True, first_seen_at=t, last_seen_at=t, created_at=t)
+            session.add(p)
+            session.flush()
+            session.add(ProductName(product_id=p.id, name=name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+
+    # 45 筆、每頁 10 筆 -> 5 頁，應該可以直接連到第 3、第 5 頁（不是只有上一頁/下一頁）
+    resp = client.get("/", params={"page_size": "10", "page": 1})
+    assert resp.status_code == 200
+    assert "page=3" in resp.text
+    assert "page=5" in resp.text
+    assert 'id="jumpPageBtn"' in resp.text
+    assert 'max="5"' in resp.text
+
+
 def test_search_page_subcategory_select_and_filter():
     client, Session_ = _make_client()
     t = datetime.datetime(2026, 2, 1)

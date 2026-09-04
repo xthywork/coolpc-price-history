@@ -47,7 +47,7 @@ def list_products(
     min_change_percent: OptionalFloat = None,
     max_change_percent: OptionalFloat = None,
     sort: str = "last_seen_desc",
-    limit: int = Query(default=50, le=200),
+    limit: int = Query(default=50, le=20000),
     offset: int = 0,
     session: Session = Depends(get_session),
 ):

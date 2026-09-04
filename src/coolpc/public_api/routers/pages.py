@@ -14,8 +14,39 @@ from coolpc.stats.service import compute_product_stats, get_price_history
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
-PAGE_SIZE = 30
+PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 500, 1000]
+DEFAULT_PAGE_SIZE = 20
+# 「全部」選項不真的省略 LIMIT（search_products 目前一律會套用 limit），
+# 而是用一個遠超過實際商品總數的大數字模擬「不分頁」，不需要改動共用的
+# search_products() 邏輯。
+_ALL_PAGE_SIZE_LIMIT = 100_000
 COMPARE_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"]
+
+
+def _resolve_page_size(page_size: str) -> tuple[str, int]:
+    """回傳 (正規化後的 page_size 字串, 實際查詢用的 limit)。"""
+    if page_size == "all":
+        return "all", _ALL_PAGE_SIZE_LIMIT
+    if page_size.isdigit() and int(page_size) in PAGE_SIZE_OPTIONS:
+        return page_size, int(page_size)
+    return str(DEFAULT_PAGE_SIZE), DEFAULT_PAGE_SIZE
+
+
+def _build_page_list(current: int, total_pages: int) -> list[int | None]:
+    """回傳分頁列要顯示的頁碼清單；None 代表省略號（…）。固定顯示第一頁、
+    最後一頁，以及目前頁碼前後兩頁，中間有斷層就插入一個 None。"""
+    if total_pages <= 7:
+        return list(range(1, total_pages + 1))
+    pages: list[int | None] = [1]
+    window_start = max(2, current - 2)
+    window_end = min(total_pages - 1, current + 2)
+    if window_start > 2:
+        pages.append(None)
+    pages.extend(range(window_start, window_end + 1))
+    if window_end < total_pages - 1:
+        pages.append(None)
+    pages.append(total_pages)
+    return pages
 
 
 @router.get("/")
@@ -34,17 +65,20 @@ def search_page(
     max_change_percent: OptionalFloat = None,
     sort: str = "price_asc",
     page: int = 1,
+    page_size: str = str(DEFAULT_PAGE_SIZE),
     session: Session = Depends(get_session),
 ):
     page = max(page, 1)
+    page_size, effective_page_size = _resolve_page_size(page_size)
     filters = SearchFilters(
         q=q, category_id=category_id, subcategory_id=subcategory_id, brand=brand, model=model,
         min_price=min_price, max_price=max_price, is_active=is_active,
         recent_change=recent_change, min_change_percent=min_change_percent,
         max_change_percent=max_change_percent,
-        sort=sort, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE,
+        sort=sort, limit=effective_page_size, offset=(page - 1) * effective_page_size,
     )
     products, total = search_products(session, filters)
+    total_pages = max((total + effective_page_size - 1) // effective_page_size, 1)
 
     last_updated_query = session.query(func.max(Product.last_seen_at)).filter(Product.merged_into_id.is_(None))
     if filters.subcategory_id is not None:
@@ -65,7 +99,7 @@ def search_page(
         "brand": brand, "model": model,
         "min_price": min_price, "max_price": max_price, "is_active": is_active,
         "recent_change": recent_change, "min_change_percent": min_change_percent,
-        "max_change_percent": max_change_percent, "sort": sort,
+        "max_change_percent": max_change_percent, "sort": sort, "page_size": page_size,
     }.items() if v not in (None, "")}
 
     subcategory_rows = (
@@ -97,10 +131,14 @@ def search_page(
             "brand": brand, "model": model,
             "min_price": min_price, "max_price": max_price, "is_active": is_active,
             "recent_change": recent_change, "min_change_percent": min_change_percent,
-            "max_change_percent": max_change_percent, "sort": sort,
+            "max_change_percent": max_change_percent, "sort": sort, "page_size": page_size,
         },
         "query_string": urlencode(query_params),
-        "page": page, "total_pages": max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1), "total": total,
+        "page": page,
+        "total_pages": total_pages,
+        "page_list": _build_page_list(page, total_pages),
+        "page_size_options": PAGE_SIZE_OPTIONS,
+        "total": total,
         "last_updated": last_updated,
     })
 

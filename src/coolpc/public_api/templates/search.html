@@ -28,6 +28,12 @@
       <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
       <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
     </select>
+    <select name="page_size" id="pageSizeSelect">
+      {% for opt in page_size_options %}
+      <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
+      {% endfor %}
+      <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
+    </select>
     <button type="submit" style="margin-left:auto;">搜尋</button>
   </div>
   <div style="display:flex; gap:8px; margin-top:8px;">
@@ -44,6 +50,14 @@
   #resultsTable th .col-resizer {
     position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
   }
+  .pagination a, .pagination .pageCurrent, .pagination .pageEllipsis {
+    display: inline-block; min-width: 28px; text-align: center; padding: 4px 6px;
+    border-radius: 4px; font-size: 14px;
+  }
+  .pagination a { text-decoration: none; border: 1px solid #d1d5db; }
+  .pagination a:hover { background: #f1f5f9; }
+  .pagination .pageCurrent { background: #4f46e5; color: #fff; font-weight: 700; }
+  .pagination .pageEllipsis { color: #9ca3af; border: none; min-width: auto; }
 </style>
 
 <table id="resultsTable">
@@ -65,10 +79,24 @@
   </tbody>
 </table>
 
-<div class="pagination">
+<div class="pagination" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
   {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}">上一頁</a>{% endif %}
-  <span>第 {{ page }} / {{ total_pages }} 頁</span>
+  {% for p in page_list %}
+    {% if p is none %}
+    <span class="pageEllipsis">…</span>
+    {% elif p == page %}
+    <span class="pageCurrent">{{ p }}</span>
+    {% else %}
+    <a href="/?{{ query_string }}&page={{ p }}">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
   {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}">下一頁</a>{% endif %}
+  <span style="margin-left:12px; display:inline-flex; align-items:center; gap:4px;">
+    跳至第
+    <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}" style="width:60px;">
+    頁（共 {{ total_pages }} 頁）
+    <button type="button" id="jumpPageBtn">前往</button>
+  </span>
 </div>
 
 <script>
@@ -86,6 +114,21 @@ function wireCompareCheckbox(cb) {
 }
 document.querySelectorAll('.compareCheckbox').forEach(wireCompareCheckbox);
 
+const jumpPageBtn = document.getElementById('jumpPageBtn');
+if (jumpPageBtn) {
+  jumpPageBtn.addEventListener('click', () => {
+    const input = document.getElementById('jumpPageInput');
+    const target = parseInt(input.value, 10);
+    if (!target || target < 1) return;
+    const params = new URLSearchParams('{{ query_string }}');
+    params.set('page', target);
+    window.location.href = '/?' + params.toString();
+  });
+  document.getElementById('jumpPageInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); jumpPageBtn.click(); }
+  });
+}
+
 // 最低/最高價格：直接用 /api/products 重抓資料、只重繪表格本身（不整頁
 // reload、不透過 ?q= 這種導頁式更新），符合「輸入價格直接影響前端表格」。
 (function () {
@@ -101,7 +144,8 @@ document.querySelectorAll('.compareCheckbox').forEach(wireCompareCheckbox);
       const el = form.elements[name];
       if (el && el.value) params.set(name, el.value);
     });
-    params.set('limit', '30');
+    const pageSizeVal = form.elements['page_size'].value;
+    params.set('limit', pageSizeVal === 'all' ? '20000' : pageSizeVal);
     return params;
   }
 
