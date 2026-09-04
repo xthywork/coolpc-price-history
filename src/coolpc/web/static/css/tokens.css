@@ -23,14 +23,14 @@
   --surface: #ffffff;
   --surface-sunk: #f5f6f7;
   --ink: #14161a;
-  --muted: #6b7076;
+  --muted: #565b63;
   --line: #dcdde0;
   --line-strong: #c3c5ca;
   --accent: #8a6a1e;
   --accent-soft: rgba(138, 106, 30, 0.12);
   --up: #c0362c;
   --down: #1b7a4b;
-  --flat: #8b9098;
+  --flat: #767c85;
 
   /* 多商品比較的類別色。順序固定、不循環，兩個主題各自選過步階，通過
      對比與色覺缺陷分辨度檢查（見 scripts 驗證：CVD ΔE 皆過門檻）。 */
@@ -45,12 +45,13 @@
     "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
 
-  --step--1: 0.8125rem;
-  --step-0: 0.9375rem;
+  --step--2: 0.875rem;
+  --step--1: 0.9375rem;
+  --step-0: 1rem;
   --step-1: 1.0625rem;
-  --step-2: 1.375rem;
-  --step-3: 1.875rem;
-  --step-4: 2.75rem;
+  --step-2: 1.5rem;
+  --step-3: 2rem;
+  --step-4: 2.875rem;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -70,7 +71,7 @@
   --surface: #181d28;
   --surface-sunk: #141924;
   --ink: #e6e8ec;
-  --muted: #8b93a1;
+  --muted: #9ba3b2;
   --line: #262d3a;
   --line-strong: #38414f;
   --accent: #c9a227;
@@ -94,7 +95,7 @@
     --surface: #181d28;
     --surface-sunk: #141924;
     --ink: #e6e8ec;
-    --muted: #8b93a1;
+    --muted: #9ba3b2;
     --line: #262d3a;
     --line-strong: #38414f;
     --accent: #c9a227;

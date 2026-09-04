@@ -69,17 +69,17 @@
 
 /* ── 搜尋結果表 ─────────────────────────────────────────── */
 
-.results th, .results td { padding-block: 7px; }
+.results th, .results td { padding-block: 9px; }
 .results .col-spark { width: 96px; padding-inline: var(--space-2); }
 .results .col-price { width: 104px; }
 .results .col-change { width: 108px; }
 .results .col-pick { width: 40px; text-align: center; }
 .results tbody td:first-child { padding-left: var(--space-3); }
 .results .name { display: block; line-height: 1.35; }
-.results .cat { color: var(--muted); font-size: 0.78rem; }
+.results .cat { color: var(--muted); font-size: var(--step--2); }
 .results .badge-low {
   color: var(--down);
-  font-size: 0.72rem;
+  font-size: var(--step--2);
   border: 1px solid currentColor;
   border-radius: var(--radius);
   padding: 0 4px;
@@ -128,7 +128,7 @@
 .price-change { font-family: var(--font-mono); font-size: var(--step-1); }
 .price-facts { display: flex; gap: var(--space-5); margin-left: auto; }
 .price-facts__item { display: flex; flex-direction: column; gap: 2px; }
-.price-facts__label { font-size: 0.78rem; color: var(--muted); }
+.price-facts__label { font-size: var(--step--2); color: var(--muted); }
 .price-facts__value {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -170,7 +170,7 @@
 .compare-chip button { border: none; background: none; color: var(--muted); padding: 0 2px; line-height: 1; }
 .compare-chip button:hover { color: var(--up); }
 
-.results .cat { display: block; color: var(--muted); font-size: 0.78rem; }
+.results .cat { display: block; color: var(--muted); font-size: var(--step--2); }
 .results .col-change { white-space: nowrap; }
 
 /* 欄寬可拖曳（沿用改版前就有的行為） */

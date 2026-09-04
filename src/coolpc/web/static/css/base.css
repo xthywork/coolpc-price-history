@@ -109,7 +109,7 @@ p { max-width: var(--measure); }
 }
 table { width: 100%; border-collapse: collapse; }
 th, td {
-  padding: 9px var(--space-3);
+  padding: 11px var(--space-3);
   text-align: left;
   font-size: var(--step--1);
   vertical-align: baseline;
@@ -133,7 +133,10 @@ th.col-num { text-align: right; }
 .up { color: var(--up); }
 .down { color: var(--down); }
 .flat { color: var(--flat); }
-.inactive td, tr.inactive td a { color: var(--muted); }
+/* 已下架的列只把輔助資訊淡化，商品名維持正常對比——整列一起變灰的話，
+   一整頁都是下架商品時（首頁預設價格排序就是這樣）會什麼都讀不出來 */
+tr.inactive td { color: var(--muted); }
+tr.inactive td a { color: var(--ink); }
 
 /* ── 表單 ───────────────────────────────────────────────── */
 

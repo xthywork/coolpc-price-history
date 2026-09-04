@@ -7,7 +7,7 @@ body { font-size: var(--step--1); }
 .site-header__brand::after {
   content: "管理";
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--step--2);
   font-weight: 400;
   color: var(--accent);
   border: 1px solid currentColor;
@@ -19,7 +19,7 @@ body { font-size: var(--step--1); }
 
 main { max-width: 1320px; }
 
-th, td { padding: 6px var(--space-3); }
+th, td { padding: 8px var(--space-3); }
 .page-head h1 { font-size: var(--step-1); }
 
 .toolbar {
@@ -37,7 +37,7 @@ th, td { padding: 6px var(--space-3); }
 /* 抓取狀態 */
 .status {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--step--2);
   border-radius: var(--radius);
   padding: 1px 6px;
   border: 1px solid currentColor;
@@ -113,7 +113,7 @@ th, td { padding: 6px var(--space-3); }
   white-space: pre-wrap;
   word-break: break-all;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--step--2);
   line-height: 1.5;
   color: var(--muted);
 }
@@ -139,14 +139,14 @@ th, td { padding: 6px var(--space-3); }
   text-align: center;
   line-height: 15px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--step--2);
   color: var(--accent);
   border: 1px solid currentColor;
   border-radius: var(--radius);
 }
 .hint__name { word-break: break-word; }
 .hint__name .id { font-family: var(--font-mono); color: var(--muted); margin-right: 5px; }
-.hint__off { color: var(--muted); font-size: 0.78rem; flex-shrink: 0; }
+.hint__off { color: var(--muted); font-size: var(--step--2); flex-shrink: 0; }
 .hint__sep { border-top: 1px dashed var(--line); }
 .hint__score {
   flex-shrink: 0;
@@ -166,7 +166,7 @@ th, td { padding: 6px var(--space-3); }
   line-height: 1.1;
   color: var(--accent);
 }
-.hint__score-label { font-size: 0.7rem; color: var(--muted); }
+.hint__score-label { font-size: var(--step--2); color: var(--muted); }
 
 /* 商品詳細：檢視用定義列表，編輯用同一組欄位 */
 .detail-list {
