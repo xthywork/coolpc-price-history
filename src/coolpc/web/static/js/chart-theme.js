@@ -56,16 +56,24 @@ window.coolpcChartTheme = {
     title.textContent = (model.title && model.title[0]) || '';
     el.appendChild(title);
 
+    // 每個系列固定佔一列，就算這個時間點還沒有資料也一樣（顯示「—」）。
+    // 只列出有值的系列會讓 tooltip 寬度隨游標位置忽寬忽窄。
+    var points = model.dataPoints || [];
+    var dataIndex = points.length ? points[0].dataIndex : -1;
+
     var rows = document.createElement('div');
     rows.className = 'chart-tip__rows';
-    (model.dataPoints || []).forEach(function (point) {
+    chart.data.datasets.forEach(function (dataset, i) {
+      if (!chart.isDatasetVisible(i)) return;
+      var raw = dataIndex < 0 ? null : dataset.data[dataIndex];
+
       var swatch = document.createElement('span');
       swatch.className = 'chart-tip__swatch';
-      swatch.style.background = point.dataset.borderColor;
+      swatch.style.background = dataset.borderColor;
 
       var name = document.createElement('span');
       name.className = 'chart-tip__name';
-      name.textContent = point.dataset.label || '';
+      name.textContent = dataset.label || '';
 
       var currency = document.createElement('span');
       currency.className = 'chart-tip__currency';
@@ -73,21 +81,27 @@ window.coolpcChartTheme = {
 
       var value = document.createElement('span');
       value.className = 'chart-tip__value';
-      value.textContent = point.parsed.y === null || point.parsed.y === undefined
-        ? '—' : point.parsed.y.toLocaleString();
+      value.textContent = (raw === null || raw === undefined) ? '—' : Number(raw).toLocaleString();
 
       rows.append(swatch, name, currency, value);
     });
     el.appendChild(rows);
 
-    // 貼著游標放，靠近右緣時翻到左側，免得被容器切掉
-    var area = chart.chartArea;
-    var flip = model.caretX > (area.left + area.right) / 2;
+    // 依游標在「畫面」的哪一半決定展開方向：右半邊往左開，左半邊往右開。
+    // 用視窗中線而不是圖表中線，才符合實際看畫面的直覺。
+    var rect = chart.canvas.getBoundingClientRect();
+    var pointerViewportX = rect.left + model.caretX;
+    var flip = pointerViewportX > window.innerWidth / 2;
+
     el.style.opacity = '1';
-    el.style.left = model.caretX + 'px';
-    el.style.top = model.caretY + 'px';
     el.style.transform = flip ? 'translate(-100%, -50%)' : 'translate(0, -50%)';
-    el.style.marginLeft = flip ? '-12px' : '12px';
+    el.style.marginLeft = flip ? '-14px' : '14px';
+    el.style.left = model.caretX + 'px';
+
+    // 垂直方向夾在圖表範圍內，貼近上下緣時才不會被切掉半截
+    var half = el.offsetHeight / 2 + 4;
+    var top = Math.min(Math.max(model.caretY, half), chart.height - half);
+    el.style.top = top + 'px';
   },
 
   // 圖表本身的配色（線色、格線）存在 chart 實例裡，切換主題時要整份換掉
