@@ -114,18 +114,23 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
     return query.all(), total
 
 
-def search_products_and(session: Session, q: str, limit: int = 10) -> list[Product]:
+def search_products_and(session: Session, q: str, limit: int | None = None) -> list[Product]:
     """AND 語意搜尋：每個空白分隔的 token 都必須各自在該商品的某個歷史名稱
     （ProductName）上比對到才算符合——不必是同一列，同一商品底下的不同
     名稱列都算數；也不要求整段字串本身連續出現（見 search_products()
     q_match="and" 分支的說明）。用於名稱自動完成（例如管理後台合併頁、
     商品比較頁的加入搜尋）：比對範圍精確，不像單純 OR 語意會在大量真實
     資料下讓真正符合的商品被籠統結果和 LIMIT 擠出去。
+
+    預設不限制筆數（limit=None）——AND 語意本身已經夠精確，使用者要看到
+    所有真正符合條件的商品，不要因為人為的筆數上限而漏掉。
     """
     if not q or not q.strip():
         return []
     tokens = q.split()
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
     query = _require_all_patterns(query, session, set(tokens))
-    query = query.order_by(Product.last_seen_at.desc()).limit(limit)
+    query = query.order_by(Product.last_seen_at.desc())
+    if limit is not None:
+        query = query.limit(limit)
     return query.all()

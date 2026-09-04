@@ -63,17 +63,16 @@ def list_products(
 
 
 @router.get("/products/autocomplete", response_model=schemas.ProductListPage)
-def autocomplete_products(
-    q: str = "", limit: int = Query(default=10, le=50), session: Session = Depends(get_session),
-):
+def autocomplete_products(q: str = "", session: Session = Depends(get_session)):
     # 精確鎖定單一商品用的自動完成端點（例如商品比較頁的搜尋加入）：空白
     # 分隔的每個片段都要同時命中（AND），完全不退回 OR 後備——寧可查無
-    # 結果，也不要讓不精確的商品混進來。
+    # 結果，也不要讓不精確的商品混進來。不限制筆數，符合條件的商品要
+    # 全部列出來。
     if not q.strip():
-        return schemas.ProductListPage(items=[], total=0, limit=limit, offset=0)
-    products = search_products_and(session, q, limit=limit)
+        return schemas.ProductListPage(items=[], total=0, limit=0, offset=0)
+    products = search_products_and(session, q)
     items = [_to_list_item(session, p) for p in products]
-    return schemas.ProductListPage(items=items, total=len(items), limit=limit, offset=0)
+    return schemas.ProductListPage(items=items, total=len(items), limit=len(items), offset=0)
 
 
 @router.get("/products/{product_id}", response_model=schemas.ProductDetail)

@@ -35,7 +35,8 @@ def product_search_json(q: str = "", session: Session = Depends(get_session)):
         return []
     # AND 語意：要求所有空白分隔的片段都命中，才能精確命中查詢的那個商品
     # 本身，完全不退回 OR 後備——寧可查無結果，也不要讓不精確的商品混進來。
-    products = search_products_and(session, q, limit=10)
+    # 不限制筆數，符合條件的商品要全部列出來。
+    products = search_products_and(session, q)
     return [
         {"id": p.id, "name": p.current_name, "price": p.current_price, "is_active": p.is_active}
         for p in products

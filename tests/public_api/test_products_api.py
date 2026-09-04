@@ -191,3 +191,16 @@ def test_autocomplete_empty_query_returns_empty_list():
     assert resp.status_code == 200
     assert resp.json()["items"] == []
     assert resp.json()["total"] == 0
+
+
+def test_autocomplete_does_not_cap_results_at_ten():
+    """搜尋結果不能被人為限制在 10 筆，超過 10 個都符合 AND 條件的商品要
+    全部列出來。"""
+    client, Session_ = _make_client()
+    for i in range(15):
+        _seed_product(Session_, f"ZOTAC RTX3050 型號{i}", 6000 + i)
+
+    resp = client.get("/api/products/autocomplete", params={"q": "ZOTAC 3050"})
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 15
+    assert len(resp.json()["items"]) == 15

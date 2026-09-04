@@ -264,6 +264,31 @@ def test_product_search_json_and_match_finds_exact_product_among_many_newer():
     assert target_id in ids
 
 
+def test_product_search_json_does_not_cap_results_at_ten():
+    """搜尋結果不能被人為限制在 10 筆，超過 10 個都符合 AND 條件的商品要
+    全部列出來。"""
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        for i in range(15):
+            p = Product(category_id=cat.id, subcategory_id=sub.id,
+                        current_name=f"ZOTAC RTX3050 型號{i}",
+                        current_price=6000 + i, is_active=True,
+                        first_seen_at=t, last_seen_at=t, created_at=t)
+            session.add(p)
+            session.flush()
+            session.add(ProductName(product_id=p.id, name=p.current_name, first_seen_at=t, last_seen_at=t))
+        session.commit()
+
+    resp = client.get("/products/search-json", params={"q": "ZOTAC 3050"})
+    assert resp.status_code == 200
+    assert len(resp.json()) == 15
+
+
 def test_product_search_json_never_falls_back_to_or():
     """AND 比對查無結果時，必須直接回傳空陣列，不能退回 OR 語意撈出一堆不
     精確的候選商品——寧可查無結果，也不要讓不精確的商品混進來。"""
@@ -351,7 +376,8 @@ def test_merge_page_has_compare_style_chip_picker_with_target_marker():
     assert "備用" not in resp.text
     # 多出來的功能：標記保留（目標）商品，且標記要在每一列最左側
     assert "mergeChipTargetRadio" in resp.text
-    assert "保留（目標商品）" in resp.text
+    assert "'主要'" in resp.text
+    assert "保留（目標商品）" not in resp.text
     # 用帶引號的 class="..." 屬性字串比對，確保比對到的是 JS 組出來的 chip
     # HTML 本身的欄位順序，不是誤中前面 CSS 選擇器（.mergeChipTargetLabel
     # 在 CSS 裡本來就寫在 .mergeChipName 後面，跟畫面上的實際順序無關）。

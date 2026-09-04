@@ -136,7 +136,7 @@
       return;
     }
     debounceTimer = setTimeout(async () => {
-      const resp = await fetch(`/api/products/autocomplete?q=${encodeURIComponent(q)}&limit=10`);
+      const resp = await fetch(`/api/products/autocomplete?q=${encodeURIComponent(q)}`);
       const data = await resp.json();
       const already = currentIds();
       renderResults((data.items || []).filter(item => !already.includes(item.id)));
