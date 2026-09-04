@@ -337,17 +337,21 @@ def test_merge_page_shows_more_than_50_merge_logs():
     assert resp.text.count("已合併") >= 60
 
 
-def test_merge_page_has_single_combined_id_or_name_inputs():
+def test_merge_page_has_compare_style_chip_picker_with_target_marker():
     client, _Session_ = _make_client()
     resp = client.get("/merge")
     assert resp.status_code == 200
-    assert 'id="sourceInput"' in resp.text
-    assert 'id="targetInput"' in resp.text
+    # 跟商品比較頁一樣：單一搜尋框 + chip 清單，不是舊版分離的兩個輸入框
+    assert 'id="mergeSearchInput"' in resp.text
+    assert resp.text.count('id="mergeSearchInput"') == 1
+    assert 'id="mergeChips"' in resp.text
+    assert 'id="sourceInput"' not in resp.text
+    assert 'id="targetInput"' not in resp.text
+    assert 'id="sourceSearch"' not in resp.text
+    assert "備用" not in resp.text
+    # 多出來的功能：標記保留（目標）商品
+    assert "mergeChipTargetRadio" in resp.text
+    assert "保留（合併後的目標商品）" in resp.text
+    # 最終送出的欄位名稱不變，後端 /merge 路由不用改
     assert 'name="source_id"' in resp.text
     assert 'name="target_id"' in resp.text
-    # 舊版分離的搜尋框 + 備用 ID 框已合併成單一輸入框
-    assert 'id="sourceSearch"' not in resp.text
-    assert 'id="sourceId"' not in resp.text
-    assert "備用" not in resp.text
-    assert resp.text.count('name="source_id"') == 1
-    assert resp.text.count('name="target_id"') == 1
