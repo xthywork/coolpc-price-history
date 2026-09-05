@@ -47,7 +47,7 @@ def test_similarity_hints_page_lists_candidates():
     resp = client.get("/similarity-hints")
     assert resp.status_code == 200
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
-    assert "85%" in resp.text
+    assert ">85</span>" in resp.text and "相似度 %" in resp.text
 
 
 def test_similarity_hints_refresh_creates_new_hints():
@@ -236,8 +236,8 @@ def test_similarity_hints_page_has_checkbox_and_no_per_row_action_column():
     assert resp.status_code == 200
     assert f'name="hint_ids" value="{hint_id}"' in resp.text
     # 按鈕文字不再有「批量」二字與括號說明
-    assert ">合併<" in resp.text
-    assert ">忽略<" in resp.text
+    assert ">合併勾選的<" in resp.text
+    assert ">忽略勾選的<" in resp.text
     assert "批量" not in resp.text
     # 舊版每列一個「不是同一商品，忽略」的獨立表單已移除
     assert "不是同一商品，忽略" not in resp.text
@@ -274,13 +274,13 @@ def test_similarity_hints_page_stacks_products_vertically_with_score_beside_and_
     # 確保比對到的是實際的 <div> 元素，不是誤中前面 CSS 的 .hintDivider 選
     # 擇器（CSS 定義本來就寫在所有卡片內容之前，跟畫面上的實際順序無關）。
     a_row_pos = resp.text.find("堆疊排版測試A")
-    divider_pos = resp.text.find('class="hintDivider"')
+    divider_pos = resp.text.find('class="hint__sep"')
     b_row_pos = resp.text.find("堆疊排版測試B")
     assert a_row_pos != -1 and divider_pos != -1 and b_row_pos != -1
     assert a_row_pos < divider_pos < b_row_pos
     # 相似度要在同一組（card）內，顯示在商品旁邊，而不是獨立的表格欄位
-    assert "hintScore" in resp.text
-    assert "hintGroup" in resp.text
+    assert "hint__score" in resp.text
+    assert 'class="hint"' in resp.text
 
 
 def test_similarity_hints_page_has_merge_all_button_with_confirm_and_reuses_batch_merge_endpoint():
@@ -307,6 +307,6 @@ def test_similarity_hints_page_has_merge_all_button_with_confirm_and_reuses_batc
 
     resp = client.get("/similarity-hints")
     assert resp.status_code == 200
-    assert '<button type="submit" formaction="/similarity-hints/batch-merge" id="mergeAllBtn">合併下列所有項目</button>' in resp.text
+    assert '<button type="submit" formaction="/similarity-hints/batch-merge" id="mergeAllBtn">合併全部候選</button>' in resp.text
     assert "confirm(" in resp.text
     assert "cb.checked = true" in resp.text

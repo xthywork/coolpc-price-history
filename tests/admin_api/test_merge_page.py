@@ -1,4 +1,5 @@
 import datetime
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from markupsafe import escape
 from fastapi.testclient import TestClient
@@ -58,8 +59,8 @@ def test_product_search_page_shows_id_and_name():
     assert resp.status_code == 200
     assert str(source_id) in resp.text
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
-    # 商品名稱欄要佔表格最大比例，不能被壓縮
-    assert "width:34%" in resp.text
+    # 商品名稱欄是唯一沒設固定寬度的欄，剩下的寬度全歸它
+    assert "<th>商品名稱</th>" in resp.text
     # 欄寬仍要能手動拖曳調整
     assert "col-resizer" in resp.text
     assert "mousedown" in resp.text
@@ -377,18 +378,18 @@ def test_merge_page_has_compare_style_chip_picker_with_target_marker():
     assert 'id="sourceSearch"' not in resp.text
     assert "備用" not in resp.text
     # 多出來的功能：標記保留（目標）商品，且標記要在每一列最左側
-    assert "mergeChipTargetRadio" in resp.text
-    assert "'主要'" in resp.text
+    assert "merge-pick__radio" in resp.text
+    assert "'保留這個'" in resp.text
     assert "保留（目標商品）" not in resp.text
-    # 用帶引號的 class="..." 屬性字串比對，確保比對到的是 JS 組出來的 chip
-    # HTML 本身的欄位順序，不是誤中前面 CSS 選擇器（.mergeChipTargetLabel
-    # 在 CSS 裡本來就寫在 .mergeChipName 後面，跟畫面上的實際順序無關）。
-    target_label_pos = resp.text.find('class="mergeChipTargetLabel"')
-    name_span_pos = resp.text.find('class="mergeChipName"')
+    # 比對 JS 組出來的 chip HTML 本身的欄位順序：標記在名稱之前。樣式已經
+    # 移到 admin.css，這裡看到的字串只會是 JS 裡的那一份。
+    target_label_pos = resp.text.find('class="merge-pick__target"')
+    name_span_pos = resp.text.find('class="merge-pick__name"')
     assert target_label_pos != -1 and name_span_pos != -1
     assert target_label_pos < name_span_pos
     # 一個商品一行（直向排列），不是並排的卡片
-    assert "flex-direction: column" in resp.text
+    css = (Path(__file__).parents[2] / "src/coolpc/web/static/css/admin.css").read_text(encoding="utf-8")
+    assert ".merge-picks { display: flex; flex-direction: column;" in css
     # 最終送出的欄位名稱不變，後端 /merge 路由不用改
     assert 'name="source_id"' in resp.text
     assert 'name="target_id"' in resp.text

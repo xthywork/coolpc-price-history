@@ -1,28 +1,106 @@
 {% extends "base.html" %}
 {% block title %}抓取狀態 - 原價屋管理介面{% endblock %}
 {% block content %}
-<h1>抓取狀態</h1>
-<form method="post" action="/scrape">
-  <button type="submit">手動執行抓取</button>
-</form>
-<table>
-  <thead>
-    <tr><th>估價時間</th><th>類型</th><th>狀態</th><th>商品總數</th><th>新商品</th><th>下架</th><th>漲價</th><th>降價</th><th>錯誤訊息</th></tr>
-  </thead>
-  <tbody>
-    {% for s in snapshots %}
-    <tr>
-      <td>{{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}</td>
-      <td>{{ s.scrape_type }}</td>
-      <td class="status-{{ s.status }}">{{ s.status }}</td>
-      <td>{{ s.total_products }}</td>
-      <td>{{ s.new_products }}</td>
-      <td>{{ s.delisted_products }}</td>
-      <td>{{ s.price_up_count }}</td>
-      <td>{{ s.price_down_count }}</td>
-      <td>{{ s.error_message or "" }}</td>
-    </tr>
+
+<div class="page-head">
+  <h1>抓取狀態</h1>
+  <span class="page-head__count">{{ "{:,}".format(total) }} 次</span>
+  <div class="page-head__end">
+    <form method="post" action="/scrape">
+      <button type="submit" data-variant="primary">立即抓取一次</button>
+    </form>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="snapshots">
+    <thead>
+      <tr>
+        <th>估價時間</th>
+        <th>類型</th>
+        <th>狀態</th>
+        <th class="col-num">商品總數</th>
+        <th class="col-num">新增</th>
+        <th class="col-num">下架</th>
+        <th class="col-num">漲價</th>
+        <th class="col-num">降價</th>
+        <th>錯誤訊息</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in snapshots %}
+      <tr {% if s.raw_html_path %}title="原始 HTML：{{ s.raw_html_path }}"{% endif %}>
+        <td class="mono">
+          {%- if s.raw_html_path -%}
+          <a href="/html-archive/{{ s.id }}">{{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}</a>
+          {%- else -%}
+          {{ s.fetched_at.strftime("%Y-%m-%d %H:%M") }}
+          {%- endif -%}
+        </td>
+        <td>{{ s.scrape_type }}</td>
+        <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
+        <td class="col-num">{{ "{:,}".format(s.total_products) }}</td>
+        <td class="col-num {{ 'zero' if not s.new_products }}">{{ s.new_products }}</td>
+        <td class="col-num {{ 'zero' if not s.delisted_products }}">{{ s.delisted_products }}</td>
+        <td class="col-num {{ 'delta-up' if s.price_up_count else 'zero' }}">{{ s.price_up_count }}</td>
+        <td class="col-num {{ 'delta-down' if s.price_down_count else 'zero' }}">{{ s.price_down_count }}</td>
+        <td>{{ s.error_message or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not snapshots %}<div class="empty">還沒有抓取記錄。按「立即抓取一次」開始。</div>{% endif %}
+</div>
+
+<div class="pagination">
+  <div class="pagination__pages">
+    {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}" rel="prev">上一頁</a>{% endif %}
+    {% for p in page_list %}
+      {% if p is none %}
+      <span class="is-gap">…</span>
+      {% elif p == page %}
+      <span class="is-current" aria-current="page">{{ p }}</span>
+      {% else %}
+      <a href="/?{{ query_string }}&page={{ p }}">{{ p }}</a>
+      {% endif %}
     {% endfor %}
-  </tbody>
-</table>
+    {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}" rel="next">下一頁</a>{% endif %}
+  </div>
+  <div class="pagination__jump">
+    <label for="jumpPageInput">跳至</label>
+    <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}">
+    <span>／ {{ "{:,}".format(total_pages) }} 頁</span>
+    <select id="pageSizeSelect" aria-label="每頁筆數">
+      {% for opt in page_size_options %}
+      <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
+      {% endfor %}
+      <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
+    </select>
+  </div>
+</div>
+
+<script>
+// 這一頁沒有篩選表單，換頁與每頁筆數都直接組 URL 導頁
+const jumpPageInput = document.getElementById('jumpPageInput');
+if (jumpPageInput) {
+  jumpPageInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const target = parseInt(jumpPageInput.value, 10);
+    if (!target || target < 1) return;
+    const params = new URLSearchParams('{{ query_string }}');
+    params.set('page', target);
+    window.location.href = '/?' + params.toString();
+  });
+}
+
+const pageSizeSelect = document.getElementById('pageSizeSelect');
+if (pageSizeSelect) {
+  pageSizeSelect.addEventListener('change', () => {
+    const params = new URLSearchParams();
+    params.set('page_size', pageSizeSelect.value);
+    window.location.href = '/?' + params.toString();
+  });
+}
+</script>
 {% endblock %}

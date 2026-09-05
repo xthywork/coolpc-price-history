@@ -1,110 +1,115 @@
 {% extends "base.html" %}
 {% block title %}商品搜尋 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
-<form class="filters" method="get" action="/" id="searchFiltersForm" style="display:block;">
-  <div style="display:flex; gap:8px; align-items:center;">
-    <input type="text" name="q" placeholder="搜尋商品名稱/舊名稱/關鍵字" value="{{ query.q }}" style="flex:1; min-width:200px;">
-    <button type="submit">搜尋</button>
+
+<form class="search-head" method="get" action="/" id="searchFiltersForm">
+  <div class="search-head__row">
+    <input type="text" name="q" placeholder="搜尋商品名稱、舊名稱或關鍵字" value="{{ query.q }}" autocomplete="off">
+    <button type="submit" data-variant="primary">搜尋</button>
   </div>
-  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
-    <select name="subcategory_id">
+
+  <div class="filters">
+    <select name="subcategory_id" aria-label="分類">
       <option value="">全部分類</option>
       {% for sc in subcategories %}
       <option value="{{ sc.id }}" {% if query.subcategory_id == sc.id %}selected{% endif %}>{{ sc.label }}</option>
       {% endfor %}
     </select>
-    <select name="brand">
+    <select name="brand" aria-label="品牌">
       <option value="">全部品牌</option>
       {% for b in brands %}
       <option value="{{ b }}" {% if query.brand == b %}selected{% endif %}>{{ b }}</option>
       {% endfor %}
     </select>
-    <select name="is_active">
-      <option value="">在售/下架</option>
-      <option value="true" {% if query.is_active == True %}selected{% endif %}>僅在售</option>
-      <option value="false" {% if query.is_active == False %}selected{% endif %}>僅下架</option>
+    <select name="is_active" aria-label="銷售狀態">
+      <option value="">販售中／已下架</option>
+      <option value="true" {% if query.is_active == True %}selected{% endif %}>販售中</option>
+      <option value="false" {% if query.is_active == False %}selected{% endif %}>已下架</option>
     </select>
-    <select name="sort">
+    <select name="sort" aria-label="排序">
       <option value="price_asc" {% if query.sort == "price_asc" %}selected{% endif %}>價格低到高</option>
       <option value="price_desc" {% if query.sort == "price_desc" %}selected{% endif %}>價格高到低</option>
-      <option value="brand_asc" {% if query.sort == "brand_asc" %}selected{% endif %}>品牌</option>
-      <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>分類</option>
-      <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>狀態</option>
+      <option value="brand_asc" {% if query.sort == "brand_asc" %}selected{% endif %}>依品牌</option>
+      <option value="category_asc" {% if query.sort == "category_asc" %}selected{% endif %}>依分類</option>
+      <option value="status_active_first" {% if query.sort == "status_active_first" %}selected{% endif %}>在售排前面</option>
     </select>
+    <span class="filters__price">
+      <input type="number" name="min_price" id="minPriceInput" placeholder="最低價" value="{{ query.min_price or '' }}" aria-label="最低價格">
+      <span>到</span>
+      <input type="number" name="max_price" id="maxPriceInput" placeholder="最高價" value="{{ query.max_price or '' }}" aria-label="最高價格">
+    </span>
   </div>
-  <div style="display:flex; gap:8px; margin-top:8px;">
-    <input type="number" name="min_price" id="minPriceInput" placeholder="最低價格" value="{{ query.min_price or '' }}">
-    <input type="number" name="max_price" id="maxPriceInput" placeholder="最高價格" value="{{ query.max_price or '' }}">
+
+  {% if latest_snapshot %}
+  <div class="pulse">
+    <span class="pulse__stamp">更新時間：{{ latest_snapshot.fetched_at.strftime("%m-%d %H:%M") }}</span>
+    <span class="pulse__item"><span class="pulse__value">{{ "{:,}".format(latest_snapshot.total_products) }}</span> 項商品</span>
+    <span class="pulse__item"><span class="pulse__value up">{{ latest_snapshot.price_up_count }}</span> 漲價</span>
+    <span class="pulse__item"><span class="pulse__value down">{{ latest_snapshot.price_down_count }}</span> 降價</span>
+    <span class="pulse__item"><span class="pulse__value">{{ latest_snapshot.new_products }}</span> 新上架</span>
+    <span class="pulse__item"><span class="pulse__value">{{ latest_snapshot.delisted_products }}</span> 下架</span>
   </div>
+  {% endif %}
 </form>
 
-<p>共 <span id="resultCount">{{ total }}</span> 筆結果{% if last_updated %}　最後更新：{{ last_updated.strftime("%Y-%m-%d %H:%M") }}{% endif %}</p>
+<p class="result-line">
+  <strong id="resultCount">{{ "{:,}".format(total) }}</strong> 筆結果
+  {% if last_updated %}<span>資料更新於 {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+</p>
 
-<style>
-  #resultsTable { table-layout: fixed; }
-  #resultsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  #resultsTable th .col-resizer {
-    position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
-  }
-  .pagination a, .pagination .pageCurrent, .pagination .pageEllipsis {
-    display: inline-block; min-width: 28px; text-align: center; padding: 4px 6px;
-    border-radius: 4px; font-size: 14px;
-  }
-  .pagination a { text-decoration: none; border: 1px solid #d1d5db; }
-  .pagination a:hover { background: #f1f5f9; }
-  .pagination .pageCurrent { background: #4f46e5; color: #fff; font-weight: 700; }
-  .pagination .pageEllipsis { color: #9ca3af; border: none; min-width: auto; }
-  #jumpPageInput { text-align: center; }
-</style>
-
-<table id="resultsTable">
-  <thead>
-    <tr>
-      <th style="width:55%">商品名稱</th><th style="width:20%">分類</th><th style="width:12%">價格</th><th style="width:8%">狀態</th><th style="width:5%"></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in rows %}
-    <tr class="{% if not row.product.is_active %}inactive{% endif %}">
-      <td><a href="/products/{{ row.product.id }}">{{ row.product.current_name }}</a></td>
-      <td>{{ row.category.label }}</td>
-      <td>${{ "{:,}".format(row.product.current_price) }}</td>
-      <td>{{ "在售" if row.product.is_active else "已下架" }}</td>
-      <td><input type="checkbox" class="compareCheckbox" data-id="{{ row.product.id }}"></td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="table-wrap">
+  <table id="resultsTable" class="results">
+    <thead>
+      <tr>
+        <th>商品</th>
+        <th class="col-num col-price">價格</th>
+        <th class="col-status">狀態</th>
+        <th class="col-pick">比較</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="{% if not row.product.is_active %}inactive{% endif %}">
+        <td>
+          <a class="name" href="/products/{{ row.product.id }}">{{ row.product.current_name }}</a>
+          <span class="cat">{{ row.category.label }}</span>
+        </td>
+        <td class="col-num col-price">{{ "{:,}".format(row.product.current_price) }}</td>
+        <td class="col-status">{{ "販售中" if row.product.is_active else "已下架" }}</td>
+        <td class="col-pick"><input type="checkbox" class="compareCheckbox" data-id="{{ row.product.id }}" aria-label="加入比較"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not rows %}
+  <div class="empty">沒有符合條件的商品。放寬價格範圍或換個關鍵字試試。</div>
+  {% endif %}
+</div>
 
 <div class="pagination">
-  <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px;">
-    {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}">上一頁</a>{% endif %}
+  <div class="pagination__pages">
+    {% if page > 1 %}<a href="/?{{ query_string }}&page={{ page - 1 }}" rel="prev">上一頁</a>{% endif %}
     {% for p in page_list %}
       {% if p is none %}
-      <span class="pageEllipsis">…</span>
+      <span class="is-gap">…</span>
       {% elif p == page %}
-      <span class="pageCurrent">{{ p }}</span>
+      <span class="is-current" aria-current="page">{{ p }}</span>
       {% else %}
       <a href="/?{{ query_string }}&page={{ p }}">{{ p }}</a>
       {% endif %}
     {% endfor %}
-    {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}">下一頁</a>{% endif %}
+    {% if page < total_pages %}<a href="/?{{ query_string }}&page={{ page + 1 }}" rel="next">下一頁</a>{% endif %}
   </div>
-  <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; margin-top:8px;">
-    <span>
-      跳至第
-      <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}" style="width:60px;">
-      頁
-    </span>
-    <span>
-      共 {{ total_pages }} 頁
-      <select name="page_size" id="pageSizeSelect" form="searchFiltersForm">
-        {% for opt in page_size_options %}
-        <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
-        {% endfor %}
-        <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
-      </select>
-    </span>
+  <div class="pagination__jump">
+    <label for="jumpPageInput">跳至</label>
+    <input type="number" id="jumpPageInput" min="1" max="{{ total_pages }}" value="{{ page }}">
+    <span>／ {{ "{:,}".format(total_pages) }} 頁</span>
+    <select name="page_size" id="pageSizeSelect" form="searchFiltersForm" aria-label="每頁筆數">
+      {% for opt in page_size_options %}
+      <option value="{{ opt }}" {% if query.page_size == opt|string %}selected{% endif %}>每頁 {{ opt }} 筆</option>
+      {% endfor %}
+      <option value="all" {% if query.page_size == "all" %}selected{% endif %}>全部顯示</option>
+    </select>
   </div>
 </div>
 
@@ -182,24 +187,35 @@ if (pageSizeSelect) {
   function buildRow(item) {
     const tr = document.createElement('tr');
     if (!item.is_active) tr.className = 'inactive';
+
     const nameTd = document.createElement('td');
     const link = document.createElement('a');
+    link.className = 'name';
     link.href = `/products/${item.id}`;
     link.textContent = item.current_name;
-    nameTd.appendChild(link);
-    const categoryTd = document.createElement('td');
-    categoryTd.textContent = item.category_name;
+    const cat = document.createElement('span');
+    cat.className = 'cat';
+    cat.textContent = item.category_name;
+    nameTd.append(link, cat);
+
     const priceTd = document.createElement('td');
-    priceTd.textContent = '$' + item.current_price.toLocaleString();
+    priceTd.className = 'col-num col-price';
+    priceTd.textContent = item.current_price.toLocaleString();
+
     const statusTd = document.createElement('td');
-    statusTd.textContent = item.is_active ? '在售' : '已下架';
+    statusTd.className = 'col-status';
+    statusTd.textContent = item.is_active ? '販售中' : '已下架';
+
     const checkboxTd = document.createElement('td');
+    checkboxTd.className = 'col-pick';
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'compareCheckbox';
     checkbox.dataset.id = item.id;
+    checkbox.setAttribute('aria-label', '加入比較');
     checkboxTd.appendChild(checkbox);
-    tr.append(nameTd, categoryTd, priceTd, statusTd, checkboxTd);
+
+    tr.append(nameTd, priceTd, statusTd, checkboxTd);
     return tr;
   }
 
@@ -212,7 +228,7 @@ if (pageSizeSelect) {
       tbody.appendChild(tr);
       wireCompareCheckbox(tr.querySelector('.compareCheckbox'));
     });
-    if (resultCount) resultCount.textContent = data.total;
+    if (resultCount) resultCount.textContent = data.total.toLocaleString();
     // 分頁連結是依整頁載入當時的篩選條件組出來的固定 URL，這裡即時重繪的
     // 結果一律視為新的第一頁，分頁連結先隱藏，避免點下去漏掉剛輸入的價格。
     if (pagination) pagination.style.display = 'none';

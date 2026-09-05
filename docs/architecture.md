@@ -57,6 +57,33 @@ get_session`）。刻意分成兩個服務而非一個 app 掛兩組路由，是
 chip 挑選器、商品編輯頁的分類/子分類連動下拉選單）都是直接在模板內嵌
 `<script>`，用 `fetch()` 呼叫既有 JSON 端點局部更新 DOM，不整頁重載。
 
+樣式與共用資產集中在 `src/coolpc/web/static/`，兩個 app 各自
+`mount("/static", ...)` 指向同一個實體目錄：
+
+| 檔案 | 內容 |
+|---|---|
+| `css/tokens.css` | 色彩、字級、間距的 CSS 變數，明暗兩套值 |
+| `css/base.css` | 兩邊共用的元素樣式（表格、表單、按鈕、分頁、header） |
+| `css/public.css` | 公開頁專用 |
+| `css/admin.css` | 管理介面專用 |
+| `fonts/*.woff2` | IBM Plex Mono（SIL OFL），只用於需要對齊的英數字串 |
+| `js/theme.js` | 明暗主題切換與記憶，並在切換時發出 `coolpc:themechange` |
+| `js/chart-theme.js` | 讓 Chart.js 的軸線與文字跟著主題走 |
+| `js/vendor/chart.umd.min.js` | Chart.js，self-host |
+
+顏色只承載訊息：紅代表漲、綠代表跌（台股慣例，與美股相反），銅金代表可
+互動與當前狀態，其餘由中性灰承擔。多商品比較的線色來自 `--series-1` 到
+`--series-5`，兩個主題各自選過步階，通過對比與色覺缺陷分辨度檢查。
+
+第三方資產一律 self-host，不從外部 CDN 載入——這是自架服務，外部 CDN 是
+不必要的單點故障。
+
+`GET /api/products/sparklines` 批次供應多個商品的取樣價格點（見
+`stats/service.py` 的 `get_sparkline_points`）：先取最近 N 天，該期間沒有
+資料的商品（例如早就下架的）改取它自己最後幾筆，整批只發兩次查詢，一次
+最多接受 100 個商品。搜尋頁曾經用它畫每列的迷你走勢圖，後來走勢欄依需求
+移除，這個端點現在只作為公開 JSON API 的一部分，沒有前端使用者。
+
 ## 資料流：抓取 → 解析 → 寫入 → 服務
 
 ```

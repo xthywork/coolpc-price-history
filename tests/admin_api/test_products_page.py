@@ -1,4 +1,5 @@
 import datetime
+from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -73,10 +74,11 @@ def test_products_page_shows_required_columns():
     pid, _, _ = _seed_product(Session_)
     resp = client.get("/products")
     assert resp.status_code == 200
-    for header in ["ID", "商品名稱", "品牌", "型號", "目前價格", "是否在售", "建立時間"]:
+    for header in ["ID", "商品名稱", "品牌", "目前價格", "狀態", "建立時間"]:
         assert f">{header}<" in resp.text
     assert "ASUS" in resp.text
-    assert "RTX5070-12G" in resp.text
+    # 型號欄移除了，空間全部讓給商品名稱
+    assert ">型號<" not in resp.text
     assert "2026-02-01" in resp.text
 
 
@@ -85,10 +87,12 @@ def test_products_page_search_input_is_wide_with_button_beside():
     resp = client.get("/products")
     assert resp.status_code == 200
     pos_q = resp.text.find('name="q"')
-    pos_button = resp.text.find(">搜尋<")
+    pos_button = resp.text.find(">搜尋</button>")
     assert pos_q != -1 and pos_button != -1
     assert pos_q < pos_button
-    assert "flex:1" in resp.text
+    # 輸入框吃滿剩餘寬度，樣式在 admin.css，不再寫 inline style
+    css = (Path(__file__).parents[2] / "src/coolpc/web/static/css/admin.css").read_text(encoding="utf-8")
+    assert ".toolbar input[type=\"text\"] { flex: 1;" in css
 
 
 def test_products_page_has_numbered_pagination_and_page_size_select():
@@ -125,12 +129,13 @@ def test_product_detail_page_shows_full_fields():
     pid, _, _ = _seed_product(Session_, current_status="特價中")
     resp = client.get(f"/products/{pid}")
     assert resp.status_code == 200
-    assert f"商品詳細資料 #{pid}" in resp.text
+    assert f'商品 <span class="mono">#{pid}</span>' in resp.text
     assert "ASUS RTX 5070 PRIME 12G" in resp.text
     assert "ASUS" in resp.text
+    # 詳細頁仍要看得到型號，移除的只是列表頁那一欄
     assert "RTX5070-12G" in resp.text
     assert "特價中" in resp.text
-    assert "$18,990" in resp.text
+    assert "18,990" in resp.text  # 價格用等寬數字呈現，幣別由欄位標題交代
     assert "顯示卡VGA" in resp.text
     assert "在售" in resp.text
     assert "2026-02-01" in resp.text
@@ -181,7 +186,7 @@ def test_product_detail_page_has_edit_button_and_hidden_edit_form():
     assert 'name="current_name"' in resp.text
     assert 'id="categorySelect"' in resp.text
     assert 'id="subcategorySelect"' in resp.text
-    assert "+ 新增類別" in resp.text
+    assert "＋ 新增分類" in resp.text
 
 
 def test_product_update_saves_fields_and_redirects():

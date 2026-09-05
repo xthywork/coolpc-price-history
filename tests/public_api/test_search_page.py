@@ -1,4 +1,5 @@
 import datetime
+from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -155,17 +156,18 @@ def test_search_page_pagination_is_centered_no_go_button_page_size_beside_total_
     client, _Session_ = _make_client()
     resp = client.get("/")
     assert resp.status_code == 200
-    # 頁碼控制列要置中
-    assert "justify-content:center" in resp.text
+    # 頁碼控制列的排版交給 pagination__pages（樣式在 base.css，不再寫 inline）
+    assert 'class="pagination__pages"' in resp.text
     # 「前往」按鈕已刪除，改成 Enter 直接跳頁
     assert 'id="jumpPageBtn"' not in resp.text
     assert ">前往<" not in resp.text
     assert "e.key !== 'Enter'" in resp.text
     # 跳頁輸入框數字置中
-    assert "#jumpPageInput { text-align: center; }" in resp.text
-    # 每頁筆數下拉選單要在「共 N 頁」文字右側，且不在最上面的篩選表單裡
+    css = (Path(__file__).parents[2] / "src/coolpc/web/static/css/base.css").read_text(encoding="utf-8")
+    assert ".pagination__jump input { width: 64px; text-align: center; }" in css
+    # 每頁筆數下拉選單要在總頁數文字右側，且不在最上面的篩選表單裡
     # （用 form="searchFiltersForm" 關聯回原本的表單，本身不在 <form> 標籤內）
-    total_pages_pos = resp.text.find("共 1 頁")
+    total_pages_pos = resp.text.find("／ 1 頁")
     page_size_pos = resp.text.find('id="pageSizeSelect"')
     assert total_pages_pos != -1 and page_size_pos != -1
     assert total_pages_pos < page_size_pos
@@ -228,7 +230,7 @@ def test_search_page_shows_category_display_name_when_set():
     resp = client.get("/")
     assert resp.status_code == 200
     assert "顯卡 / NVIDIA" in resp.text
-    assert "<td>顯卡</td>" in resp.text
+    assert 'class="cat">顯卡' in resp.text
     assert "顯示卡VGA" not in resp.text
 
 
@@ -342,7 +344,7 @@ def test_search_page_price_inputs_moved_last_to_own_row_with_auto_submit():
     assert pos_sort != -1 and pos_min_price != -1 and pos_max_price != -1
     assert pos_sort < pos_min_price < pos_max_price
     # 搜尋按鈕在第一行（價格欄位之前），只送出第一行欄位仍在同一個 form 內
-    pos_button = resp.text.find(">搜尋<")
+    pos_button = resp.text.find(">搜尋</button>")
     assert pos_button != -1
     assert pos_button < pos_min_price
     # 價格欄位變動要用 /api/products 局部重繪表格（不是 ?q= 整頁導頁式更新，
@@ -361,11 +363,14 @@ def test_search_page_keyword_input_wide_button_beside_it_dropdowns_on_next_row()
     # 關鍵字輸入框變寬（flex:1），搜尋按鈕緊接在它右側，不再用 margin-left:auto
     # 靠右對齊
     pos_q = resp.text.find('name="q"')
-    pos_button = resp.text.find(">搜尋<")
+    pos_button = resp.text.find(">搜尋</button>")
     pos_subcategory = resp.text.find('name="subcategory_id"')
     assert pos_q != -1 and pos_button != -1 and pos_subcategory != -1
     assert pos_q < pos_button < pos_subcategory
-    assert "flex:1" in resp.text
+    # 輸入框吃滿剩餘寬度，改由 public.css 負責，不再寫 inline style
+    css = (Path(__file__).parents[2] / "src/coolpc/web/static/css/public.css").read_text(encoding="utf-8")
+    assert ".search-head__row input[type=\"text\"] {" in css
+    assert "flex: 1;" in css
     assert "margin-left:auto" not in resp.text
     autoupdate_start = resp.text.find("function autoUpdatePriceFilter")
     autoupdate_end = resp.text.find("})();", autoupdate_start)
@@ -435,16 +440,25 @@ def test_search_page_results_table_only_has_four_columns_plus_checkbox():
 
     resp = client.get("/")
     assert resp.status_code == 200
+    # 表格維持精簡：舊版那幾個統計欄位都不該回來
     assert "上次價格" not in resp.text
-    assert "漲跌</th>" not in resp.text
     assert "30天最低" not in resp.text
     assert "30天最高" not in resp.text
     assert "<th>最後更新</th>" not in resp.text
-    assert "商品名稱" in resp.text
-    assert "分類" in resp.text
-    assert "狀態" in resp.text
-    # 商品名稱欄要佔表格一半以上寬度，不能被壓縮
-    assert 'style="width:55%"' in resp.text
+    # 欄位就是這四個：商品、價格、狀態、比較勾選
+    thead = resp.text[resp.text.find("<thead>"):resp.text.find("</thead>")]
+    assert thead.count("</th>") == 4
+    for header in (">商品<", ">價格<", ">狀態<", ">比較<"):
+        assert header in thead
+    # 比較欄的欄名要看得見，不是只給螢幕閱讀器
+    assert '<th class="col-pick">比較</th>' in thead
+    # 分類跟在商品名底下，不另外佔一欄
+    assert 'class="cat"' in resp.text
+    # 販售狀態獨立成欄，用詞跟篩選選單一致
+    assert '<td class="col-status">已下架</td>' in resp.text or \
+           '<td class="col-status">販售中</td>' in resp.text
+    # 商品欄是唯一沒有固定寬度的欄，才吃得到剩下的所有寬度
+    assert "<th>商品</th>" in thead
     assert f'data-id="{product_id}"' in resp.text
     assert 'class="compareCheckbox"' in resp.text
 
@@ -467,9 +481,9 @@ def test_search_page_shows_global_last_updated_after_result_count():
 
     resp = client.get("/")
     assert resp.status_code == 200
-    assert '<span id="resultCount">2</span>' in resp.text
+    assert '<strong id="resultCount">2</strong>' in resp.text
     count_pos = resp.text.find('id="resultCount"')
-    updated_pos = resp.text.find("最後更新")
+    updated_pos = resp.text.find("資料更新於")
     assert count_pos != -1
     assert updated_pos != -1
     assert updated_pos > count_pos

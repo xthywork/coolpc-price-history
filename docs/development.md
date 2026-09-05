@@ -10,6 +10,12 @@
 - **前端不使用任何框架**，一律 Jinja2 伺服端渲染 + 原生 JavaScript
   （`<script>` 直接內嵌在模板裡，用 `fetch()` 呼叫既有 JSON 端點局部更新
   DOM）。新頁面請延續這個模式，不要引入 React/Vue/建置工具鏈。
+- **樣式寫在 `src/coolpc/web/static/css/`，不要寫 inline style**。顏色、
+  字級、間距一律用 `tokens.css` 裡的 CSS 變數，不要寫死 hex；新的顏色如果
+  不屬於既有 token，先想清楚它承載什麼訊息再加一個 token。兩個主題的值都
+  要補上，深色不是把淺色反過來就好。
+- **第三方前端資產一律 self-host**（放進 `web/static/`），不要改成從 CDN
+  載入——這是自架服務，外部 CDN 是不必要的單點故障。
 - **畫面文案一律使用繁體中文**。
 - **Schema 演進只透過 Alembic migration**，不依賴 `Base.metadata.
   create_all()` 讓正式環境自動長出新欄位/新表（測試套件例外，見下方）。

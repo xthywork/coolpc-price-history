@@ -7,7 +7,7 @@ from coolpc.query_types import OptionalInt, OptionalBool, OptionalDatetime
 from coolpc.public_api import schemas
 from coolpc.db.models import Category, Subcategory, Product, ProductName
 from coolpc.search.service import SearchFilters, search_products, search_products_and
-from coolpc.stats.service import compute_product_stats, get_price_history
+from coolpc.stats.service import compute_product_stats, get_price_history, get_sparkline_points
 
 router = APIRouter(prefix="/api")
 
@@ -56,6 +56,36 @@ def list_products(
     products, total = search_products(session, filters)
     items = [_to_list_item(session, p) for p in products]
     return schemas.ProductListPage(items=items, total=total, limit=limit, offset=offset)
+
+
+# 這個端點必須註冊在 /products/{product_id} 之前，否則 "sparklines" 會先被
+# 當成 product_id 吃掉。
+@router.get("/products/sparklines")
+def product_sparklines(
+    ids: str = "",
+    days: int = Query(default=30, ge=1, le=3650),
+    session: Session = Depends(get_session),
+):
+    """回傳 {商品 id: [價格點]}，給搜尋結果的迷你走勢圖用。
+
+    一次最多 100 個商品：搜尋頁每頁筆數可以選到「全部顯示」，沒有這個上限
+    的話一次點擊就會拉出幾萬條走勢，既無法閱讀也不值得那個查詢成本。
+    """
+    product_ids = []
+    for part in ids.split(","):
+        part = part.strip()
+        if part.isdigit():
+            product_ids.append(int(part))
+    if not product_ids:
+        return {}
+    if len(product_ids) > 100:
+        raise HTTPException(status_code=400, detail="一次最多查詢 100 個商品的走勢")
+    visible_ids = [
+        pid for pid in dict.fromkeys(product_ids)
+        if (product := session.get(Product, pid)) is not None and _is_visible(product)
+    ]
+    points = get_sparkline_points(session, visible_ids, days=days)
+    return {str(pid): prices for pid, prices in points.items() if prices}
 
 
 @router.get("/products/autocomplete", response_model=schemas.ProductListPage)

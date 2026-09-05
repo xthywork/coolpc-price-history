@@ -1,48 +1,83 @@
 {% extends "base.html" %}
 {% block title %}商品比較 - 原價屋歷史價格查詢{% endblock %}
 {% block content %}
-<h1>商品比較</h1>
-<p><a href="#" onclick="window.coolpcCompare.clear(); window.location.href='/compare'; return false;">清空比較清單</a></p>
 
-<style>
-  #comparePickerBox { position: relative; max-width: 640px; }
-  #compareSearchInput { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
-  #compareChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .compareChip {
-    display: flex; align-items: center; gap: 6px; max-width: 260px;
-    background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 16px; padding: 4px 10px;
-  }
-  .compareChipName { white-space: normal; word-break: break-word; font-size: 13px; line-height: 1.3; }
-  .compareChipRemove { cursor: pointer; color: #6366f1; font-weight: bold; flex-shrink: 0; }
-  .compareChipRemove:hover { color: #ef4444; }
-  #compareSearchResults {
-    position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
-    background: #fff; border: 1px solid #d1d5db; border-radius: 6px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.12); max-height: 260px; overflow-y: auto; z-index: 20;
-  }
-  #compareSearchResults div { padding: 8px; cursor: pointer; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-  #compareSearchResults div:last-child { border-bottom: none; }
-  #compareSearchResults div.active, #compareSearchResults div:hover { background: #eef2ff; }
-  #comparePickerHint { font-size: 12px; color: #6b7280; margin-top: 4px; min-height: 1em; }
-</style>
+<div class="page-head">
+  <h1>商品比較</h1>
+</div>
+
 <form method="get" action="/compare" id="compareIdsForm">
-  <div id="comparePickerBox">
-    <input type="text" id="compareSearchInput" placeholder="搜尋商品名稱加入比較（最多 5 個，可用上下鍵選擇、Enter 加入）..." autocomplete="off">
-    <div id="compareSearchResults" hidden></div>
+  <div class="picker" id="comparePickerBox">
+    <input type="text" id="compareSearchInput" placeholder="搜尋商品名稱加入比較，最多 5 個" autocomplete="off">
+    <div class="picker__results" id="compareSearchResults" hidden></div>
   </div>
-  <div id="compareChips">
+  <div class="compare-list" id="compareChips">
     {% for item in items %}
-    <div class="compareChip" data-id="{{ item.product.id }}">
-      <span class="compareChipName">{{ item.product.current_name }}</span>
-      <span class="compareChipRemove" title="移除">✕</span>
-    </div>
+    <span class="compare-chip series-{{ loop.index }}" data-id="{{ item.product.id }}">
+      <span class="compare-chip__name">{{ item.product.current_name }}</span>
+      <button type="button" class="compare-chip__remove" title="移除" aria-label="移除">✕</button>
+    </span>
     {% endfor %}
   </div>
-  <p id="comparePickerHint"></p>
+  <p class="picker__hint" id="comparePickerHint"></p>
   <input type="hidden" name="ids" id="idsHidden" value="{{ ids }}">
-  <button type="submit">比較</button>
+  <div class="range-bar">
+    <button type="submit" data-variant="primary">比較</button>
+    <button type="button" id="clearCompare">清空清單</button>
+  </div>
 </form>
 
+{% if error %}<p class="notice notice--error">{{ error }}</p>{% endif %}
+
+{% if items %}
+<div class="table-wrap">
+  <table id="compareTable">
+    <thead>
+      <tr>
+        <th>商品</th>
+        <th class="col-num" style="width:120px">現價</th>
+        <th class="col-num" style="width:120px">歷史最低</th>
+        <th class="col-num" style="width:120px">歷史最高</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>
+          <span class="series-swatch series-{{ loop.index }}"></span>
+          <a href="/products/{{ item.product.id }}">{{ item.product.current_name }}</a>
+        </td>
+        <td class="col-num">{{ "{:,}".format(item.product.current_price) }}</td>
+        <td class="col-num down">{{ "{:,}".format(item.stats.all_time_low) }}</td>
+        <td class="col-num up">{{ "{:,}".format(item.stats.all_time_high) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>價格走勢</h2>
+<div class="range-bar">
+  <button type="button" data-range="7">7 天</button>
+  <button type="button" data-range="30">30 天</button>
+  <button type="button" data-range="90">90 天</button>
+  <button type="button" data-range="all" aria-pressed="true">全部</button>
+  <span class="range-bar__custom">
+    <label for="rangeStart">自訂</label>
+    <input type="date" id="rangeStart">
+    <span>到</span>
+    <input type="date" id="rangeEnd">
+  </span>
+</div>
+<div class="chart-box">
+  <canvas id="compareChart"></canvas>
+</div>
+{% elif not error %}
+<div class="empty">還沒有選擇商品。在上面搜尋兩個以上的商品，就能把它們的價格走勢疊在一起看。</div>
+{% endif %}
+
+<script src="/static/js/vendor/chart.umd.min.js"></script>
+<script src="/static/js/chart-theme.js"></script>
 <script>
 (function () {
   const MAX_CHIPS = 5;
@@ -56,15 +91,20 @@
   let debounceTimer;
 
   function currentIds() {
-    return Array.from(chipsBox.querySelectorAll('.compareChip')).map(el => parseInt(el.dataset.id, 10));
+    return Array.from(chipsBox.querySelectorAll('.compare-chip')).map(el => parseInt(el.dataset.id, 10));
   }
 
   function syncHidden() {
     idsHidden.value = currentIds().join(',');
+    // 色票是照清單順序給的，移除中間一個之後要重編，否則畫面上的顏色會
+    // 跟送出後圖表上的顏色對不起來
+    chipsBox.querySelectorAll('.compare-chip').forEach((chip, i) => {
+      chip.className = 'compare-chip series-' + (i + 1);
+    });
   }
 
   function wireRemove(chip) {
-    chip.querySelector('.compareChipRemove').addEventListener('click', () => {
+    chip.querySelector('.compare-chip__remove').addEventListener('click', () => {
       chip.remove();
       syncHidden();
       hint.textContent = '';
@@ -77,18 +117,18 @@
       hint.textContent = `最多只能比較 ${MAX_CHIPS} 個商品，請先移除一個再加入新的。`;
       return;
     }
-    const chip = document.createElement('div');
-    chip.className = 'compareChip';
+    const chip = document.createElement('span');
+    chip.className = 'compare-chip';
     chip.dataset.id = id;
-    chip.innerHTML = '<span class="compareChipName"></span><span class="compareChipRemove" title="移除">✕</span>';
-    chip.querySelector('.compareChipName').textContent = name;
+    chip.innerHTML = '<span class="compare-chip__name"></span><button type="button" class="compare-chip__remove" title="移除" aria-label="移除">✕</button>';
+    chip.querySelector('.compare-chip__name').textContent = name;
     chipsBox.appendChild(chip);
     wireRemove(chip);
     syncHidden();
     hint.textContent = '';
   }
 
-  chipsBox.querySelectorAll('.compareChip').forEach(wireRemove);
+  chipsBox.querySelectorAll('.compare-chip').forEach(wireRemove);
 
   function closeResults() {
     resultsBox.hidden = true;
@@ -99,9 +139,9 @@
 
   function highlight(index) {
     const children = resultsBox.querySelectorAll('div');
-    children.forEach(c => c.classList.remove('active'));
+    children.forEach(c => c.classList.remove('is-active'));
     if (index >= 0 && index < children.length) {
-      children[index].classList.add('active');
+      children[index].classList.add('is-active');
       children[index].scrollIntoView({ block: 'nearest' });
     }
     activeIndex = index;
@@ -168,56 +208,27 @@
     if (!document.getElementById('comparePickerBox').contains(e.target)) closeResults();
   });
 
+  document.getElementById('clearCompare').addEventListener('click', () => {
+    window.coolpcCompare.clear();
+    window.location.href = '/compare';
+  });
+
   syncHidden();
 })();
 </script>
 
-{% if error %}<p style="color:#b91c1c">{{ error }}</p>{% endif %}
-
 {% if items %}
-<style>
-  #compareTable { table-layout: fixed; }
-  #compareTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  #compareTable th .col-resizer {
-    position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; user-select: none;
-  }
-</style>
-<table id="compareTable">
-  <thead>
-    <tr>
-      <th style="width:55%">商品</th><th style="width:15%">現價</th><th style="width:15%">歷史最低</th><th style="width:15%">歷史最高</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in items %}
-    <tr>
-      <td>
-        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:{{ colors[loop.index0 % colors|length] }};"></span>
-        <a href="/products/{{ item.product.id }}">{{ item.product.current_name }}</a>
-      </td>
-      <td>${{ "{:,}".format(item.product.current_price) }}</td>
-      <td>${{ "{:,}".format(item.stats.all_time_low) }}</td>
-      <td>${{ "{:,}".format(item.stats.all_time_high) }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<h2>價格走勢</h2>
-<div>
-  <button data-range="7">7天</button>
-  <button data-range="30">30天</button>
-  <button data-range="90">90天</button>
-  <button data-range="all">全部</button>
-  自訂：<input type="date" id="rangeStart"> ~ <input type="date" id="rangeEnd">
-</div>
-<canvas id="compareChart" height="100"></canvas>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 const productIds = [{% for item in items %}{{ item.product.id }}{% if not loop.last %},{% endif %}{% endfor %}];
-const colors = {{ colors|tojson }};
+const productNames = {{ items | map(attribute="product.current_name") | list | tojson }};
 let compareChart;
+let chartLabels = [];
+
+// 系列顏色一律從 CSS 變數讀，切換主題時整份重新取一次，圖表才會跟著換色
+function seriesColor(theme, index) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue('--series-' + ((index % 5) + 1)).trim();
+}
 
 async function loadCompareChart(params) {
   const seriesList = [];
@@ -232,40 +243,71 @@ async function loadCompareChart(params) {
   const labelSet = new Set();
   seriesList.forEach(series => series.forEach(pt => labelSet.add(pt.scraped_at)));
   const labels = Array.from(labelSet).sort();
+  chartLabels = labels.map(l => l.replace('T', ' ').slice(0, 16));
 
+  const theme = window.coolpcChartTheme.applyDefaults(Chart);
   const datasets = seriesList.map((series, i) => {
     const priceByTime = Object.fromEntries(series.map(pt => [pt.scraped_at, pt.price]));
     return {
-      label: `商品 ${productIds[i]}`,
+      label: productNames[i],
       data: labels.map(l => (l in priceByTime ? priceByTime[l] : null)),
-      borderColor: colors[i % colors.length],
+      borderColor: seriesColor(theme, i),
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      tension: 0,
       spanGaps: true,
       fill: false,
     };
   });
 
   if (compareChart) {
-    compareChart.data.labels = labels;
+    compareChart.data.labels = chartLabels;
     compareChart.data.datasets = datasets;
+    compareChart.options.scales.x.ticks.callback =
+      window.coolpcChartTheme.dateOnlyTicks(chartLabels);
     compareChart.update();
-  } else {
-    const ctx = document.getElementById('compareChart').getContext('2d');
-    compareChart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: labels, datasets: datasets },
-      options: {
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { title: { display: true, text: '日期 / 時間' } },
-          y: { title: { display: true, text: '價格 TWD' } },
+    return;
+  }
+  const ctx = document.getElementById('compareChart').getContext('2d');
+  compareChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: chartLabels, datasets: datasets },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        // 商品名稱與色票已經在上面的比較表裡成對出現，那張表就是圖例
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external: window.coolpcChartTheme.externalTooltip,
         },
       },
-    });
-  }
+      scales: {
+        x: {
+          grid: { color: theme.line },
+          ticks: {
+            color: theme.muted,
+            maxTicksLimit: 8,
+            callback: window.coolpcChartTheme.dateOnlyTicks(chartLabels),
+          },
+        },
+        y: {
+          grid: { color: theme.line },
+          // 橫格線給少一點，圖表變高之後才不會整片都是線
+          ticks: { color: theme.muted, maxTicksLimit: 6, callback: (v) => v.toLocaleString() },
+        },
+      },
+    },
+  });
 }
 
 document.querySelectorAll('button[data-range]').forEach(btn => {
   btn.addEventListener('click', () => {
+    document.querySelectorAll('button[data-range]').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+    document.getElementById('rangeStart').value = '';
+    document.getElementById('rangeEnd').value = '';
     const range = btn.dataset.range;
     loadCompareChart(range === 'all' ? {} : { days: range });
   });
@@ -275,6 +317,7 @@ function loadCustomRange() {
   const startVal = document.getElementById('rangeStart').value;
   const endVal = document.getElementById('rangeEnd').value;
   if (!startVal && !endVal) return;
+  document.querySelectorAll('button[data-range]').forEach(b => b.setAttribute('aria-pressed', 'false'));
   loadCompareChart({
     start: startVal ? `${startVal}T00:00:00` : '',
     end: endVal ? `${endVal}T23:59:59` : '',
@@ -282,6 +325,11 @@ function loadCustomRange() {
 }
 document.getElementById('rangeStart').addEventListener('change', loadCustomRange);
 document.getElementById('rangeEnd').addEventListener('change', loadCustomRange);
+
+document.addEventListener('coolpc:themechange', () => {
+  window.coolpcChartTheme.applyDefaults(Chart);
+  window.coolpcChartTheme.repaint(compareChart, seriesColor);
+});
 
 loadCompareChart({});
 
