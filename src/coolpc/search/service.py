@@ -16,9 +16,18 @@ class SearchFilters:
     min_price: int | None = None
     max_price: int | None = None
     is_active: bool | None = None
+    # 原價屋的估價單裡混有活動公告、運費/安裝說明、保固通知這類非商品項目，
+    # 一律標價 1 元。公開查詢頁把它們濾掉（它們沒有價格可查），管理後台則
+    # 維持看得到（預設 False），才能編輯或合併這些項目。
+    exclude_ads: bool = False
     sort: str = "last_seen_desc"
     limit: int = 50
     offset: int = 0
+
+
+# 原價屋用這個價格標示非商品的公告/說明項目；實際資料裡沒有任何真正的商品
+# 賣 1 元（次低價是四位數），所以用「剛好等於 1」判斷不會誤傷真商品。
+AD_PRICE = 1
 
 
 _SORT_MAP = {
@@ -88,6 +97,8 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
         query = query.filter(Product.current_price <= filters.max_price)
     if filters.is_active is not None:
         query = query.filter(Product.is_active == filters.is_active)
+    if filters.exclude_ads:
+        query = query.filter(Product.current_price != AD_PRICE)
 
     total = query.count()
     if filters.sort == "category_asc":
@@ -103,7 +114,8 @@ def search_products(session: Session, filters: SearchFilters) -> tuple[list[Prod
     return query.all(), total
 
 
-def search_products_and(session: Session, q: str, limit: int | None = None) -> list[Product]:
+def search_products_and(session: Session, q: str, limit: int | None = None,
+                         exclude_ads: bool = False) -> list[Product]:
     """AND 語意搜尋：每個空白分隔的 token 都必須各自在該商品的某個歷史名稱
     （ProductName）上比對到才算符合——不必是同一列，同一商品底下的不同
     名稱列都算數；也不要求整段字串本身連續出現（見 search_products()
@@ -119,6 +131,8 @@ def search_products_and(session: Session, q: str, limit: int | None = None) -> l
     tokens = q.split()
     query = session.query(Product).filter(Product.merged_into_id.is_(None))
     query = _require_all_patterns(query, session, set(tokens))
+    if exclude_ads:
+        query = query.filter(Product.current_price != AD_PRICE)
     query = query.order_by(Product.last_seen_at.desc())
     if limit is not None:
         query = query.limit(limit)

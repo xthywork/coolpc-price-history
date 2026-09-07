@@ -322,3 +322,70 @@ def test_search_products_q_match_and_requires_both_words():
     and_results2, and_total2 = search_products(session, SearchFilters(q="RTX 5070", q_match="and"))
     assert and_total2 == 1
     assert and_results2[0].current_name == "ASUS RTX 5070 PRIME 12G"
+
+
+def _seed_ad_and_real_product(session):
+    """原價屋把活動公告、運費說明這類非商品項目也放在估價單裡，一律標價 1 元。"""
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    real = _add(session, cat, sub, "ASUS RTX 5070 PRIME 12G", 18990, True, t)
+    ad = _add(session, cat, sub, "【微星活動官網】買 ASUS 指定款登錄送好禮", 1, True, t)
+    session.commit()
+    return real, ad
+
+
+def test_search_excludes_one_dollar_ads_when_requested():
+    session = _session()
+    real, ad = _seed_ad_and_real_product(session)
+
+    results, total = search_products(session, SearchFilters(q="ASUS", exclude_ads=True))
+    ids = [p.id for p in results]
+    assert real.id in ids
+    assert ad.id not in ids
+    assert total == 1
+
+
+def test_search_includes_one_dollar_ads_by_default():
+    # 後台要能查到這些項目，所以預設不過濾。
+    session = _session()
+    real, ad = _seed_ad_and_real_product(session)
+
+    results, total = search_products(session, SearchFilters(q="ASUS"))
+    ids = [p.id for p in results]
+    assert real.id in ids
+    assert ad.id in ids
+    assert total == 2
+
+
+def test_search_excludes_ads_only_at_exactly_one_dollar():
+    # 只有剛好 1 元才是廣告；2 元的商品（若存在）不該被誤刪。
+    session = _session()
+    cat = Category(name="顯示卡VGA")
+    sub = Subcategory(name="NVIDIA", category=cat)
+    session.add_all([cat, sub])
+    session.flush()
+    t = datetime.datetime(2026, 2, 1)
+    cheap = _add(session, cat, sub, "測試商品 兩元", 2, True, t)
+    ad = _add(session, cat, sub, "測試商品 一元廣告", 1, True, t)
+    session.commit()
+
+    results, _ = search_products(session, SearchFilters(q="測試商品", exclude_ads=True))
+    ids = [p.id for p in results]
+    assert cheap.id in ids
+    assert ad.id not in ids
+
+
+def test_search_products_and_can_exclude_ads():
+    session = _session()
+    real, ad = _seed_ad_and_real_product(session)
+
+    with_ads = search_products_and(session, "ASUS")
+    assert ad.id in [p.id for p in with_ads]
+
+    without_ads = search_products_and(session, "ASUS", exclude_ads=True)
+    ids = [p.id for p in without_ads]
+    assert real.id in ids
+    assert ad.id not in ids

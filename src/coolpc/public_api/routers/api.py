@@ -50,7 +50,7 @@ def list_products(
 ):
     filters = SearchFilters(
         q=q, q_match=q_match, category_id=category_id, subcategory_id=subcategory_id, brand=brand, model=model,
-        min_price=min_price, max_price=max_price, is_active=is_active,
+        min_price=min_price, max_price=max_price, is_active=is_active, exclude_ads=True,
         sort=sort, limit=limit, offset=offset,
     )
     products, total = search_products(session, filters)
@@ -96,7 +96,7 @@ def autocomplete_products(q: str = "", session: Session = Depends(get_session)):
     # 全部列出來。
     if not q.strip():
         return schemas.ProductListPage(items=[], total=0, limit=0, offset=0)
-    products = search_products_and(session, q)
+    products = search_products_and(session, q, exclude_ads=True)
     items = [_to_list_item(session, p) for p in products]
     return schemas.ProductListPage(items=items, total=len(items), limit=len(items), offset=0)
 

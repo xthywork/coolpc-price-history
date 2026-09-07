@@ -496,3 +496,33 @@ def test_search_page_table_is_resizable():
     assert resp.status_code == 200
     assert "col-resizer" in resp.text
     assert "mousedown" in resp.text
+
+
+def test_search_page_hides_one_dollar_ad_products():
+    # 原價屋估價單裡的活動公告/運費說明等非商品項目一律標價 1 元，公開查詢
+    # 頁不該把它們當商品列出來（後台仍看得到，見 tests/admin_api）。
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        real = Product(category_id=cat.id, subcategory_id=sub.id,
+                       current_name="ASUS RTX 5070 真商品",
+                       current_price=18990, is_active=True, last_seen_at=t, created_at=t)
+        ad = Product(category_id=cat.id, subcategory_id=sub.id,
+                     current_name="ASUS 活動公告登錄送好禮",
+                     current_price=1, is_active=True, last_seen_at=t, created_at=t)
+        session.add_all([real, ad])
+        session.flush()
+        session.add_all([
+            ProductName(product_id=real.id, name=real.current_name, first_seen_at=t, last_seen_at=t),
+            ProductName(product_id=ad.id, name=ad.current_name, first_seen_at=t, last_seen_at=t),
+        ])
+        session.commit()
+
+    resp = client.get("/", params={"q": "ASUS"})
+    assert resp.status_code == 200
+    assert "ASUS RTX 5070 真商品" in resp.text
+    assert "ASUS 活動公告登錄送好禮" not in resp.text

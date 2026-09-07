@@ -68,7 +68,7 @@ def search_page(
     page_size, effective_page_size = _resolve_page_size(page_size)
     filters = SearchFilters(
         q=q, category_id=category_id, subcategory_id=subcategory_id, brand=brand, model=model,
-        min_price=min_price, max_price=max_price, is_active=is_active,
+        min_price=min_price, max_price=max_price, is_active=is_active, exclude_ads=True,
         sort=sort, limit=effective_page_size, offset=(page - 1) * effective_page_size,
     )
     products, total = search_products(session, filters)

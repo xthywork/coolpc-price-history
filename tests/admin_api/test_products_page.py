@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from coolpc.db.models import Base, Category, Subcategory, Product
+from coolpc.db.models import Base, Category, Subcategory, Product, ProductName
 from coolpc.admin_api.app import app
 from coolpc.admin_api.dependencies import get_session
 
@@ -280,3 +280,30 @@ def test_create_category_rejects_blank_name():
     client, _Session_ = _make_client()
     resp = client.post("/categories", data={"name": "   "})
     assert resp.status_code == 400
+
+
+def test_admin_products_page_still_shows_one_dollar_ad_products():
+    # 公開查詢頁會濾掉 1 元的活動公告項目，但後台必須查得到，才能編輯或合併。
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        session.add(cat)
+        session.flush()
+        sub = Subcategory(name="NVIDIA", category_id=cat.id)
+        session.add(sub)
+        session.flush()
+        ad = Product(
+            category_id=cat.id, subcategory_id=sub.id, current_name="ASUS 活動公告登錄送好禮",
+            current_price=1, is_active=True, last_seen_at=t, created_at=t,
+        )
+        session.add(ad)
+        session.flush()
+        # 搜尋是比對 product_names，不是 products.current_name
+        session.add(ProductName(product_id=ad.id, name=ad.current_name,
+                                 first_seen_at=t, last_seen_at=t))
+        session.commit()
+
+    resp = client.get("/products", params={"q": "活動公告"})
+    assert resp.status_code == 200
+    assert "ASUS 活動公告登錄送好禮" in resp.text
