@@ -52,6 +52,33 @@ def _seed_two_products(Session_):
         return source.id, target.id
 
 
+def _seed_products(Session_, count: int):
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="批次合併測試分類")
+        sub = Subcategory(name="批次合併測試子分類", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        products = [
+            Product(
+                category_id=cat.id, subcategory_id=sub.id,
+                current_name=f"批次合併測試商品 {index}",
+                current_price=10000 + index, is_active=True,
+                last_seen_at=t, created_at=t,
+            )
+            for index in range(1, count + 1)
+        ]
+        session.add_all(products)
+        session.flush()
+        session.add_all([
+            ProductName(product_id=product.id, name=product.current_name,
+                        first_seen_at=t, last_seen_at=t)
+            for product in products
+        ])
+        session.commit()
+        return [product.id for product in products]
+
+
 def test_product_search_page_shows_id_and_name():
     client, Session_ = _make_client()
     source_id, _ = _seed_two_products(Session_)
@@ -134,6 +161,84 @@ def test_merge_same_source_and_target_shows_error():
     assert "error" in resp.headers["location"]
 
 
+def test_merge_form_prefills_requested_products_and_marks_first_as_target():
+    client, Session_ = _make_client()
+    first_id, second_id, target_id = _seed_products(Session_, 3)
+
+    resp = client.get("/merge", params={"ids": f"{first_id},{second_id},{target_id}"})
+
+    assert resp.status_code == 200
+    for product_id in (first_id, second_id, target_id):
+        assert f'data-id="{product_id}"' in resp.text
+        assert f"批次合併測試商品 {product_id}" in resp.text
+    assert f'class="merge-pick is-target" data-id="{first_id}"' in resp.text
+    assert f'value="{first_id}" checked' in resp.text
+
+
+def test_merge_form_rejects_invalid_prefill_ids():
+    client, Session_ = _make_client()
+    first_id, second_id, third_id, fourth_id, fifth_id, sixth_id = _seed_products(Session_, 6)
+    with Session_() as session:
+        merged = session.get(Product, sixth_id)
+        merged.merged_into_id = fifth_id
+        session.commit()
+
+    invalid_queries = [
+        f"{first_id},{first_id}",
+        f"{first_id},not-a-number",
+        str(first_id),
+        f"{first_id},{second_id},{third_id},{fourth_id},{fifth_id},{sixth_id}",
+        f"{first_id},{sixth_id}",
+    ]
+    for ids in invalid_queries:
+        resp = client.get("/merge", params={"ids": ids})
+        assert resp.status_code == 200
+        assert 'class="notice notice--error"' in resp.text
+        assert 'class="merge-pick" data-id=' not in resp.text
+
+
+def test_merge_post_merges_multiple_sources_into_selected_target():
+    client, Session_ = _make_client()
+    source_one_id, source_two_id, target_id = _seed_products(Session_, 3)
+
+    resp = client.post(
+        "/merge",
+        data={"source_id": [str(source_one_id), str(source_two_id)], "target_id": str(target_id)},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 303
+    assert parse_qs(urlparse(resp.headers["location"]).query)["message"] == ["已合併 2 個來源商品"]
+    with Session_() as session:
+        sources = session.query(Product).filter(Product.id.in_([source_one_id, source_two_id])).all()
+        assert {source.merged_into_id for source in sources} == {target_id}
+        logs = session.query(MergeLog).order_by(MergeLog.source_product_id).all()
+        assert [(log.source_product_id, log.target_product_id) for log in logs] == [
+            (source_one_id, target_id), (source_two_id, target_id),
+        ]
+
+
+def test_merge_post_rolls_back_all_sources_when_any_source_is_already_merged():
+    client, Session_ = _make_client()
+    valid_source_id, merged_source_id, target_id, prior_target_id = _seed_products(Session_, 4)
+    with Session_() as session:
+        merged_source = session.get(Product, merged_source_id)
+        merged_source.merged_into_id = prior_target_id
+        session.commit()
+
+    resp = client.post(
+        "/merge",
+        data={"source_id": [str(valid_source_id), str(merged_source_id)], "target_id": str(target_id)},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 303
+    assert "error" in parse_qs(urlparse(resp.headers["location"]).query)
+    with Session_() as session:
+        assert session.get(Product, valid_source_id).merged_into_id is None
+        assert session.query(MergeLog).count() == 0
+
+
 def test_undo_already_undone_merge_shows_error_via_http():
     """MergeError from an already-undone merge must surface through the HTTP layer,
     not crash and not silently look like a success."""
@@ -165,7 +270,7 @@ def test_merge_error_message_with_special_characters_survives_redirect(monkeypat
     """Regression test for the redirect-URL-building fix: error/message text must be
     properly urlencoded, not f-string-interpolated raw into the query string. Real
     MergeError messages from Task 15 never happen to contain '&', '=', or '#' today, so
-    this monkeypatches merge_products (as imported into the products router module) to
+    this monkeypatches merge_products_batch (as imported into the products router module) to
     raise a MergeError whose message deliberately contains those query-string-special
     characters, and verifies the text survives the redirect round-trip unmangled -
     proving the query string isn't fragmented or truncated."""
@@ -174,10 +279,10 @@ def test_merge_error_message_with_special_characters_survives_redirect(monkeypat
 
     tricky_message = "錯誤：a&b=c#d"
 
-    def fake_merge_products(session, source_id, target_id):
+    def fake_merge_products_batch(session, source_ids, target_id):
         raise MergeError(tricky_message)
 
-    monkeypatch.setattr(products_router, "merge_products", fake_merge_products)
+    monkeypatch.setattr(products_router, "merge_products_batch", fake_merge_products_batch)
 
     resp = client.post("/merge", data={"source_id": source_id, "target_id": target_id},
                         follow_redirects=False)
@@ -390,6 +495,6 @@ def test_merge_page_has_compare_style_chip_picker_with_target_marker():
     # 一個商品一行（直向排列），不是並排的卡片
     css = (Path(__file__).parents[2] / "src/coolpc/web/static/css/admin.css").read_text(encoding="utf-8")
     assert ".merge-picks { display: flex; flex-direction: column;" in css
-    # 最終送出的欄位名稱不變，後端 /merge 路由不用改
-    assert 'name="source_id"' in resp.text
+    # source_id 由 syncHidden() 依選取 chip 動態建立，支援同名欄位提交多個來源。
+    assert 'id="sourceIdsHidden"' in resp.text
     assert 'name="target_id"' in resp.text

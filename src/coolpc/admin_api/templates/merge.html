@@ -10,16 +10,27 @@
 {% if error %}<p class="notice notice--error">{{ error }}</p>{% endif %}
 
 <form method="post" action="/merge" id="mergeForm">
-  <p>選兩個要合併的商品，再標記其中一個為合併後保留的主要商品。</p>
+  <p>選 2 至 5 個要合併的商品，再標記其中一個為合併後保留的主要商品。</p>
   <div class="picker" id="mergePickerBox">
-    <input type="text" id="mergeSearchInput" placeholder="搜尋商品名稱加入，最多 2 個" autocomplete="off">
+    <input type="text" id="mergeSearchInput" placeholder="搜尋商品名稱加入，最多 5 個" autocomplete="off">
     <div class="picker__results" id="mergeSearchResults" hidden></div>
   </div>
-  <div class="merge-picks" id="mergeChips"></div>
+  <div class="merge-picks" id="mergeChips">
+    {% for product in prefill_products %}
+    <div class="merge-pick{% if loop.first %} is-target{% endif %}" data-id="{{ product.id }}">
+      <label class="merge-pick__target">
+        <input type="radio" name="mergeTargetChoice" class="merge-pick__radio" value="{{ product.id }}"{% if loop.first %} checked{% endif %}>
+        保留這個
+      </label>
+      <span class="merge-pick__name">{{ product.current_name }}</span>
+      <button type="button" class="merge-pick__remove" title="移除" aria-label="移除">✕</button>
+    </div>
+    {% endfor %}
+  </div>
   <p class="picker__hint picker__hint--error" id="mergePickerHint"></p>
-  <input type="hidden" name="source_id" id="sourceIdHidden">
+  <div id="sourceIdsHidden"></div>
   <input type="hidden" name="target_id" id="targetIdHidden">
-  <button type="submit" data-variant="primary">合併這兩個商品</button>
+  <button type="submit" data-variant="primary">合併所選商品</button>
 </form>
 
 <h2>合併紀錄</h2>
@@ -57,12 +68,12 @@
 
 <script>
 (function () {
-  const MAX_CHIPS = 2;
+  const MAX_CHIPS = 5;
   const searchInput = document.getElementById('mergeSearchInput');
   const resultsBox = document.getElementById('mergeSearchResults');
   const chipsBox = document.getElementById('mergeChips');
   const hint = document.getElementById('mergePickerHint');
-  const sourceHidden = document.getElementById('sourceIdHidden');
+  const sourceHidden = document.getElementById('sourceIdsHidden');
   const targetHidden = document.getElementById('targetIdHidden');
   const form = document.getElementById('mergeForm');
   let activeIndex = -1;
@@ -76,9 +87,15 @@
   function syncHidden() {
     const chips = Array.from(chipsBox.querySelectorAll('.merge-pick'));
     const targetChip = chips.find(c => c.querySelector('.merge-pick__radio').checked);
-    const sourceChip = chips.find(c => c !== targetChip);
     targetHidden.value = targetChip ? targetChip.dataset.id : '';
-    sourceHidden.value = sourceChip ? sourceChip.dataset.id : '';
+    sourceHidden.innerHTML = '';
+    chips.filter(c => c !== targetChip).forEach(c => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'source_id';
+      input.value = c.dataset.id;
+      sourceHidden.appendChild(input);
+    });
     chips.forEach(c => {
       c.classList.toggle('is-target', c === targetChip);
     });
@@ -96,7 +113,7 @@
   function addChip(id, name) {
     if (currentIds().includes(id)) return;
     if (currentIds().length >= MAX_CHIPS) {
-      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品（來源與目標各一個）。`;
+      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品。`;
       return;
     }
     const chip = document.createElement('div');
@@ -104,7 +121,7 @@
     chip.dataset.id = id;
     chip.innerHTML =
       '<label class="merge-pick__target">' +
-        '<input type="radio" name="mergeTargetChoice" class="merge-pick__radio">' +
+        `<input type="radio" name="mergeTargetChoice" class="merge-pick__radio" value="${id}"${currentIds().length === 0 ? ' checked' : ''}>` +
         '保留這個' +
       '</label>' +
       '<span class="merge-pick__name"></span>' +
@@ -157,7 +174,7 @@
     const q = searchInput.value.trim();
     if (!q) { closeResults(); return; }
     if (currentIds().length >= MAX_CHIPS) {
-      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品（來源與目標各一個）。`;
+      hint.textContent = `最多只能選擇 ${MAX_CHIPS} 個商品。`;
       closeResults();
       return;
     }
@@ -196,14 +213,14 @@
 
   form.addEventListener('submit', (e) => {
     syncHidden();
-    if (!sourceHidden.value || !targetHidden.value) {
+    if (currentIds().length < 2 || !targetHidden.value) {
       e.preventDefault();
-      hint.textContent = '請選兩個商品，並標記其中一個為保留的主要商品。';
-    } else if (sourceHidden.value === targetHidden.value) {
-      e.preventDefault();
-      hint.textContent = '來源與目標商品不能是同一個。';
+      hint.textContent = '請選 2 至 5 個商品，並標記其中一個為保留的主要商品。';
     }
   });
+
+  Array.from(chipsBox.querySelectorAll('.merge-pick')).forEach(wireChip);
+  syncHidden();
 })();
 </script>
 {% endblock %}

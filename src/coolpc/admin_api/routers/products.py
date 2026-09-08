@@ -11,7 +11,7 @@ from coolpc.admin_api.dependencies import get_session
 from coolpc.query_types import OptionalInt, OptionalBool
 from coolpc.db.models import Category, MergeLog, Product, Subcategory
 from coolpc.search.service import SearchFilters, search_products, search_products_and
-from coolpc.merging.service import merge_products, undo_merge, MergeError
+from coolpc.merging.service import merge_products_batch, undo_merge, MergeError
 from coolpc.public_api.routers.pages import (
     PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, _resolve_page_size, _build_page_list,
 )
@@ -25,6 +25,27 @@ def _get_product_or_404(session: Session, product_id: int) -> Product:
     if product is None:
         raise HTTPException(status_code=404, detail="商品不存在")
     return product
+
+
+def _parse_merge_product_ids(raw_ids: list[str]) -> list[int]:
+    if not 2 <= len(raw_ids) <= 5:
+        raise MergeError("合併商品總數必須介於 2 至 5 個")
+    try:
+        product_ids = [int(raw_id) for raw_id in raw_ids]
+    except ValueError as exc:
+        raise MergeError("商品 ID 必須是整數") from exc
+    if len(product_ids) != len(set(product_ids)):
+        raise MergeError("合併商品不可重複")
+    return product_ids
+
+
+def _validate_merge_products(session: Session, product_ids: list[int]) -> list[Product]:
+    products = [session.get(Product, product_id) for product_id in product_ids]
+    if any(product is None for product in products):
+        raise MergeError("商品不存在")
+    if any(product.merged_into_id is not None for product in products):
+        raise MergeError("已被合併的商品不可再選取")
+    return products
 
 
 @router.get("/products")
@@ -155,7 +176,8 @@ def create_category(name: str = Form(...), session: Session = Depends(get_sessio
 
 
 @router.get("/merge")
-def merge_form(request: Request, message: str | None = None, error: str | None = None,
+def merge_form(request: Request, ids: str | None = None,
+               message: str | None = None, error: str | None = None,
                session: Session = Depends(get_session)):
     # 批量合併一次最多可產生 100 組 MergeLog（similarity-hints 頁一次最多勾選
     # 100 組候選配對），這裡的上限要能容納這個實際上限，否則超出的紀錄永遠
@@ -166,18 +188,33 @@ def merge_form(request: Request, message: str | None = None, error: str | None =
          "target": session.get(Product, log.target_product_id)}
         for log in logs
     ]
+    prefill_products: list[Product] = []
+    if ids is not None:
+        try:
+            prefill_ids = _parse_merge_product_ids(ids.split(","))
+            prefill_products = _validate_merge_products(session, prefill_ids)
+        except MergeError as exc:
+            error = error or str(exc)
     return templates.TemplateResponse(request, "merge.html", {
         "message": message, "error": error, "log_rows": log_rows,
+        "prefill_products": prefill_products,
     })
 
 
 @router.post("/merge")
-def do_merge(source_id: int = Form(...), target_id: int = Form(...),
-             session: Session = Depends(get_session)):
+async def do_merge(request: Request, session: Session = Depends(get_session)):
     try:
-        merge_products(session, source_id, target_id)
+        form = await request.form()
+        raw_source_ids = form.getlist("source_id")
+        raw_target_ids = form.getlist("target_id")
+        if len(raw_target_ids) != 1:
+            raise MergeError("必須指定一個保留商品")
+        product_ids = _parse_merge_product_ids(raw_source_ids + raw_target_ids)
+        source_ids, target_id = product_ids[:-1], product_ids[-1]
+        _validate_merge_products(session, product_ids)
+        merge_products_batch(session, source_ids, target_id)
         session.commit()
-        qs = urlencode({"message": "合併成功"})
+        qs = urlencode({"message": f"已合併 {len(source_ids)} 個來源商品"})
         return RedirectResponse(url=f"/merge?{qs}", status_code=303)
     except MergeError as exc:
         session.rollback()
