@@ -58,6 +58,8 @@ def product_search(
     })
 
 
+# 這個端點必須註冊在 /products/{product_id} 之前，否則 "search-json" 會先被
+# 當成 product_id 吃掉。
 @router.get("/products/search-json")
 def product_search_json(q: str = "", session: Session = Depends(get_session)):
     if not q.strip():

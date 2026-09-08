@@ -66,9 +66,8 @@ Starlette 依**註冊順序**比對路徑樣板，先中先贏。`/products/{pro
 - `public_api/routers/api.py:61-63` — `/products/sparklines` 註冊在
   `/products/{product_id}`（同檔 104 行）之前，原始碼有註解說明原因。
   `/products/autocomplete`（91 行）同理。
-- `admin_api/routers/products.py:61` — `/products/search-json` 排在
-  `/products/{product_id}`（75 行）之前。**這裡沒有註解**，改動這個檔案時
-  特別容易不小心把新的 `/{id}` 路由插到它前面。
+- `admin_api/routers/products.py:63` — `/products/search-json` 排在
+  `/products/{product_id}`（同檔 77 行）之前，原始碼同樣有註解說明原因。
 
 新增任何 `/products/<字串>` 路由時，一律加在動態路由**上面**。
 
