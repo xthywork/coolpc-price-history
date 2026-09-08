@@ -9,6 +9,8 @@
 新舊商品比對、重複商品的合併方向，全部都是確定性（deterministic）的程式
 規則，不涉及任何模型推論，行為可重現、可測試。
 
+- **要動這個專案的程式碼（人或 agent）請先讀 [`AGENTS.md`](AGENTS.md)**：
+  開發慣例與踩過的地雷（路由註冊順序、匯入時序、WAL 備份等）。
 - 完整文件索引：[`docs/`](docs/)
 - 原始設計文件（初版，部分內容已隨系統演進而過時，見
   [`docs/architecture.md`](docs/architecture.md) 開頭的「與原始設計文件的差異」）：
@@ -113,7 +115,20 @@ uv run uvicorn coolpc.admin_api.app:app --host 0.0.0.0 --port 33691
 管理介面的存取來源，請自行在 nginx（或其他反向代理）設定存取限制，並將
 對外流量導向 `127.0.0.1:33690`（公開）與 `127.0.0.1:33691`（管理）。
 
-### 正式環境部署（systemd）
+### systemd 部署
+
+有兩種安裝方式，**兩者的 unit 檔位置、執行帳號、指令都不同，不要混用**：
+
+| | 系統層級 | 使用者層級 |
+|---|---|---|
+| unit 檔位置 | `/etc/systemd/system/` | `~/.config/systemd/user/` |
+| 範本來源 | repo 的 `deploy/*.service` | 依現場路徑自行撰寫 |
+| 需要 sudo | 是 | 否 |
+| 執行帳號 | 專用的 `coolpc` 帳號 | 目前登入的使用者 |
+| 指令 | `sudo systemctl ...` | `systemctl --user ...` |
+| 適用情境 | 正式環境（`/opt` 安裝） | 沒有 sudo 權限、或裝在家目錄 |
+
+#### 系統層級（正式環境，需要 sudo）
 
 ```bash
 sudo cp deploy/coolpc-scraper.service deploy/coolpc-scraper.timer \
@@ -145,8 +160,37 @@ systemctl status coolpc-admin.service
 journalctl -u coolpc-scraper.service -n 50
 ```
 
+#### 使用者層級（不需要 sudo）
+
+沒有 sudo 權限、或專案裝在家目錄時，可以改用 user-level systemd。unit 檔放
+在 `~/.config/systemd/user/`，內容與 `deploy/*.service` 類似，但要拿掉
+`User=`／`Group=`（user service 本來就以該使用者身分執行），並把 service 的
+`WantedBy` 由 `multi-user.target` 改成 `default.target`；`WorkingDirectory`、
+`ExecStart`、`Environment=COOLPC_DB_PATH=` 改成實際安裝路徑。
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now coolpc-public.service coolpc-admin.service
+systemctl --user enable --now coolpc-scraper.timer
+
+# 讓服務在登出後仍繼續執行、並在開機時自動啟動（只需設定一次）
+loginctl enable-linger "$USER"
+```
+
+狀態檢查同樣要加 `--user`：
+
+```bash
+systemctl --user status coolpc-public.service
+systemctl --user list-timers coolpc-scraper.timer
+journalctl --user -u coolpc-scraper.service -n 50
+```
+
+**注意**：`systemctl` 不加 `--user` 會去找系統層級的 unit，對這組服務會顯示
+「找不到」。
+
 完整部署細節（含資料庫備份策略、日後 schema migration 的正確操作流程）見
-[`docs/deployment.md`](docs/deployment.md)。
+[`docs/deployment.md`](docs/deployment.md)；在全新機器上從 git 佈署的逐步流程
+見 [`docs/new-machine-setup.md`](docs/new-machine-setup.md)。
 
 ## CLI 手動操作
 
@@ -160,12 +204,25 @@ uv run coolpc-scraper scrape --manual
 # 匯入單一 HTML 檔案（使用檔案內嵌的估價時間，而非匯入當下的系統時間）
 uv run coolpc-scraper import-html /path/to/2026-02-01-21-40.html
 
-# 匯入整個目錄（遞迴尋找所有 *.html，依檔名時間排序後依序處理）
+# 匯入整個目錄（遞迴尋找所有 *.html，依完整檔案路徑排序後依序處理）
 uv run coolpc-scraper import-dir /path/to/html/dir
 ```
 
 也可以透過管理介面首頁（`http://<主機>:33691/`）點擊「手動執行抓取」按鈕
 達到跟 `scrape --manual` 相同的效果。
+
+批次匯入前請先看
+[`docs/new-machine-setup.md`](docs/new-machine-setup.md#第二部分一次匯入一批既有的-html)
+的注意事項，其中幾點很容易踩到：
+
+- **處理順序是檔案路徑字母序，不是內嵌估價時間**。因為每份快照都會把「這次
+  沒出現的商品」標記為下架，檔案順序必須與時間順序一致；`YYYY-MM-DD-HH-MM`
+  這類命名剛好符合。
+- **匯入不會複製檔案**，資料庫只記下來源路徑（後台的原始 HTML 檢視會直接開
+  那個路徑），所以要先把檔案放到最終位置再匯入。
+- **匯入以估價時間判斷重複**，同一個時間點重跑不會重複寫入，中斷後可安全重來。
+- **匯入不受抓取併發鎖保護**，大批匯入前先停掉排程
+  （`systemctl --user stop coolpc-scraper.timer`）。
 
 ## 執行測試
 
@@ -173,11 +230,13 @@ uv run coolpc-scraper import-dir /path/to/html/dir
 uv run pytest
 ```
 
-大多數測試不需要任何外部資料即可執行。其中
-`tests/test_regression_real_html.py` 是端對端回歸測試，需要一份不納入版控
-的真實原價屋 HTML 樣本語料庫；預設路徑是 `/home/xthybot/coolpc/download`，
-可用 `COOLPC_SAMPLE_DIR` 環境變數指向其他位置，**找不到語料庫時該測試檔會
-自動 skip，不會讓測試套件失敗**。
+大多數測試不需要任何外部資料即可執行。其中解析器、scraper、CLI 與端對端
+回歸測試（目前是 `tests/parser/`、`tests/scraper/` 底下的檔案，加上
+`tests/test_cli.py` 與 `tests/test_regression_real_html.py`；確切清單可用
+`grep -rl COOLPC_SAMPLE_DIR tests/` 查）會用到一份不納入版控的真實原價屋
+HTML 樣本語料庫；預設路徑是 `/home/xthybot/coolpc/download`，可用
+`COOLPC_SAMPLE_DIR` 環境變數指向其他位置，**找不到語料庫時這些測試會自動
+skip，不會讓測試套件失敗**。
 
 測試涵蓋 HTML 解析（含 cp950/Big5 編碼、多種降價/漲價標記格式、促銷倒數
 尾綴清理）、分類/子分類建立、價格更新、改名、下架/重新上架、人工合併、
@@ -206,8 +265,26 @@ Undo 合併、相似度合併建議、AND/OR 搜尋語意、分頁、商品比�
   全部/自訂區間）、歷史名稱清單、加入比較。
 - **商品比較頁**：同時比較 2 至 5 個商品，透過搜尋輸入框 + 下拉選單挑選商品
   （chip 形式呈現已選商品），並排顯示價格走勢圖與統計數據。
-- **JSON API**：見 [`docs/api-reference.md`](docs/api-reference.md)，無需
-  登入或 API Key。
+- **自動排除廣告項目**：原價屋的估價單裡混有活動公告、運費／安裝說明、保固
+  通知這類非商品項目，一律標價 1 元。公開端的搜尋頁、`/api/products`、比較頁
+  的商品挑選都會把它們濾掉（它們沒有價格可查）；**管理介面則維持看得到**，
+  才能編輯或合併這些項目。判斷條件是「價格剛好等於 1」，實際資料裡沒有任何
+  真商品賣 1 元。
+- **JSON API**：無需登入或 API Key。
+
+  | 端點 | 用途 |
+  |---|---|
+  | `GET /api/categories` | 全部分類 |
+  | `GET /api/products` | 商品列表查詢（關鍵字、分類、品牌、價格區間、排序、分頁） |
+  | `GET /api/products/autocomplete` | 名稱自動完成（AND 語意、不限筆數） |
+  | `GET /api/products/sparklines` | 批次取多個商品的迷你走勢資料點（一次最多 100 個） |
+  | `GET /api/products/{id}` | 單一商品詳細資料與統計 |
+  | `GET /api/products/{id}/prices` | 該商品的歷史價格序列（可指定區間） |
+  | `GET /api/products/{id}/stats` | 該商品的價格統計 |
+  | `GET /api/compare?ids=1,2,3` | 多商品比較（2～5 個） |
+
+  參數、回應格式與範例見
+  [`docs/api-reference.md`](docs/api-reference.md)。
 
 ### 管理介面（`:33691`）
 
@@ -255,16 +332,19 @@ migrations/             Alembic migration
 tests/                   測試（含真實 HTML 樣本端對端回歸測試）
 docs/                    完整專案文件（見下方文件索引）
 docs/superpowers/        初版設計文件與各階段實作計畫（歷史留存，非最新狀態）
+AGENTS.md                開發慣例與地雷（接手改程式碼前必讀）
 ```
 
 ## 文件索引
 
 | 文件 | 內容 |
 |---|---|
+| [`AGENTS.md`](AGENTS.md) | **開發慣例與地雷**：接手改這個專案前必讀 |
 | [`docs/architecture.md`](docs/architecture.md) | 系統架構、資料流、解析/比對/合併邏輯細節 |
 | [`docs/database-schema.md`](docs/database-schema.md) | 完整資料表/欄位說明，含已移除欄位紀錄 |
 | [`docs/api-reference.md`](docs/api-reference.md) | 公開 JSON API 完整參考 |
 | [`docs/admin-guide.md`](docs/admin-guide.md) | 管理介面逐頁操作說明 |
 | [`docs/search-semantics.md`](docs/search-semantics.md) | AND/OR 搜尋語意詳細規則 |
 | [`docs/deployment.md`](docs/deployment.md) | 正式環境部署、備份、schema migration 操作程序 |
+| [`docs/new-machine-setup.md`](docs/new-machine-setup.md) | 在新機器上從 git 佈署、批次匯入既有 HTML |
 | [`docs/development.md`](docs/development.md) | 開發慣例、TDD 流程、新增 migration |
