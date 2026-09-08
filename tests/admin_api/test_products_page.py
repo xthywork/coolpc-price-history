@@ -115,6 +115,29 @@ def test_products_page_sync_selection_shows_selected_count():
     assert 'selectedProductsCount.textContent = `已選擇 ${selectedCount} 個商品`;' in sync_function
 
 
+def test_products_page_can_clear_cross_page_product_selection():
+    client, _Session_ = _make_client()
+
+    resp = client.get("/products")
+
+    actions_start = resp.text.find('id="productBatchActions"')
+    actions_end = resp.text.find("</div>", actions_start)
+    actions_html = resp.text[actions_start:actions_end]
+    assert 'id="clearSelectedProducts"' in actions_html
+    assert ">清除已選商品<" in actions_html
+
+    selection_start = resp.text.find("const productSelectionStorageKey")
+    selection_end = resp.text.find("const jumpPageInput", selection_start)
+    selection_script = resp.text[selection_start:selection_end]
+    clear_start = selection_script.find('clearSelectedProducts.addEventListener("click"')
+    clear_end = selection_script.find("});", clear_start) + len("});")
+    clear_handler = selection_script[clear_start:clear_end]
+    assert "selectedProductIds.clear();" in clear_handler
+    assert "sessionStorage.removeItem(productSelectionStorageKey);" in clear_handler
+    assert "productSelectionError.hidden = true;" in clear_handler
+    assert "syncProductSelection();" in clear_handler
+
+
 def test_products_page_selection_actions_open_safe_new_tabs():
     client, _Session_ = _make_client()
 

@@ -30,6 +30,7 @@
   <span id="selectedProductsCount">已選擇 0 個商品</span>
   <span class="batch-actions__error" id="productSelectionError" hidden>一次最多選擇 5 個商品</span>
   <div class="batch-actions__buttons">
+    <button type="button" id="clearSelectedProducts">清除已選商品</button>
     <button type="button" id="compareSelectedProducts" disabled>比較所選商品</button>
     <button type="button" id="mergeSelectedProducts" data-variant="primary" disabled>合併所選商品</button>
   </div>
@@ -124,6 +125,7 @@ const selectedProductsCount = document.getElementById("selectedProductsCount");
 const productSelectionError = document.getElementById("productSelectionError");
 const compareSelectedProducts = document.getElementById("compareSelectedProducts");
 const mergeSelectedProducts = document.getElementById("mergeSelectedProducts");
+const clearSelectedProducts = document.getElementById("clearSelectedProducts");
 const selectedProductIds = new Set();
 
 try {
@@ -187,6 +189,13 @@ if (selectAllProducts) {
     syncProductSelection();
   });
 }
+
+clearSelectedProducts.addEventListener("click", () => {
+  selectedProductIds.clear();
+  productSelectionError.hidden = true;
+  syncProductSelection();
+  try { sessionStorage.removeItem(productSelectionStorageKey); } catch (e) {}
+});
 
 compareSelectedProducts.addEventListener("click", () => {
   const selectedIds = [...selectedProductIds];

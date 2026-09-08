@@ -197,6 +197,18 @@ def test_merge_form_rejects_invalid_prefill_ids():
         assert 'class="merge-pick" data-id=' not in resp.text
 
 
+def test_merge_form_rejects_prefill_with_missing_product_without_prefilling():
+    client, Session_ = _make_client()
+    first_id, second_id = _seed_products(Session_, 2)
+
+    resp = client.get("/merge", params={"ids": f"{first_id},{second_id + 999}"})
+
+    assert resp.status_code == 200
+    assert 'class="notice notice--error"' in resp.text
+    assert "商品不存在" in resp.text
+    assert 'class="merge-pick" data-id=' not in resp.text
+
+
 def test_merge_post_merges_multiple_sources_into_selected_target():
     client, Session_ = _make_client()
     source_one_id, source_two_id, target_id = _seed_products(Session_, 3)

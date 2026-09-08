@@ -110,6 +110,7 @@ def test_batch_merge_merges_multiple_sources_into_specified_target():
     assert source_a.merged_into_id == target.id
     assert source_b.merged_into_id == target.id
     assert [log.target_product_id for log in logs] == [target.id, target.id]
+    assert {log.source_product_id for log in logs} == {source_a.id, source_b.id}
 
 
 def test_batch_merge_prevalidates_all_sources_before_caller_rollback():
