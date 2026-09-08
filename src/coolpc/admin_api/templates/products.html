@@ -26,10 +26,20 @@
   <button type="submit" data-variant="primary">搜尋</button>
 </form>
 
+<div class="batch-actions" id="productBatchActions" aria-live="polite">
+  <span id="selectedProductsCount">已選擇 0 個商品</span>
+  <span class="batch-actions__error" id="productSelectionError" hidden>一次最多選擇 5 個商品</span>
+  <div class="batch-actions__buttons">
+    <button type="button" id="compareSelectedProducts" disabled>比較所選商品</button>
+    <button type="button" id="mergeSelectedProducts" data-variant="primary" disabled>合併所選商品</button>
+  </div>
+</div>
+
 <div class="table-wrap">
   <table id="adminProductsTable">
     <thead>
       <tr>
+        <th class="col-select" style="width:44px"><input type="checkbox" id="selectAllProducts" aria-label="全選目前頁面商品"></th>
         <th class="col-num" style="width:70px">ID</th>
         <th>商品名稱</th>
         <th style="width:12%">品牌</th>
@@ -41,6 +51,7 @@
     <tbody>
       {% for p in products %}
       <tr class="{% if not p.is_active %}inactive{% endif %}">
+        <td class="col-select"><input type="checkbox" class="productSelectCheckbox" value="{{ p.id }}" aria-label="選取商品 #{{ p.id }}"></td>
         <td class="col-num">{{ p.id }}</td>
         <td><a href="/products/{{ p.id }}">{{ p.current_name }}</a></td>
         <td>{{ p.brand or "" }}</td>
@@ -105,6 +116,91 @@ function makeColumnsResizable(table) {
 }
 const adminProductsTable = document.getElementById('adminProductsTable');
 if (adminProductsTable) makeColumnsResizable(adminProductsTable);
+
+const productSelectionStorageKey = "coolpc_admin_product_selection";
+const productSelectCheckboxes = Array.from(document.querySelectorAll(".productSelectCheckbox"));
+const selectAllProducts = document.getElementById("selectAllProducts");
+const selectedProductsCount = document.getElementById("selectedProductsCount");
+const productSelectionError = document.getElementById("productSelectionError");
+const compareSelectedProducts = document.getElementById("compareSelectedProducts");
+const mergeSelectedProducts = document.getElementById("mergeSelectedProducts");
+const selectedProductIds = new Set();
+
+try {
+  const storedIds = JSON.parse(sessionStorage.getItem(productSelectionStorageKey) || "[]");
+  if (Array.isArray(storedIds)) {
+    storedIds.forEach((id) => {
+      const normalizedId = String(parseInt(id, 10));
+      if (/^\d+$/.test(normalizedId) && selectedProductIds.size < 5) selectedProductIds.add(normalizedId);
+    });
+  }
+} catch (e) {}
+
+function syncProductSelection() {
+  productSelectCheckboxes.forEach((checkbox) => {
+    checkbox.checked = selectedProductIds.has(checkbox.value);
+  });
+  const selectedCount = selectedProductIds.size;
+  selectedProductsCount.textContent = `已選擇  個商品`;
+  compareSelectedProducts.disabled = selectedCount < 2;
+  mergeSelectedProducts.disabled = selectedCount < 2;
+  if (selectAllProducts) {
+    const visibleSelectedCount = productSelectCheckboxes.filter((checkbox) => checkbox.checked).length;
+    selectAllProducts.checked = productSelectCheckboxes.length > 0 && visibleSelectedCount === productSelectCheckboxes.length;
+    selectAllProducts.indeterminate = visibleSelectedCount > 0 && !selectAllProducts.checked;
+  }
+  try { sessionStorage.setItem(productSelectionStorageKey, JSON.stringify([...selectedProductIds])); } catch (e) {}
+}
+
+function showProductSelectionLimit() {
+  productSelectionError.hidden = false;
+}
+
+productSelectCheckboxes.forEach((checkbox) => {
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked && !selectedProductIds.has(checkbox.value) && selectedProductIds.size >= 5) {
+      checkbox.checked = false;
+      showProductSelectionLimit();
+      return;
+    }
+    if (checkbox.checked) selectedProductIds.add(checkbox.value);
+    else selectedProductIds.delete(checkbox.value);
+    productSelectionError.hidden = true;
+    syncProductSelection();
+  });
+});
+
+if (selectAllProducts) {
+  selectAllProducts.addEventListener("change", () => {
+    if (selectAllProducts.checked) {
+      for (const checkbox of productSelectCheckboxes) {
+        if (!selectedProductIds.has(checkbox.value) && selectedProductIds.size >= 5) {
+          showProductSelectionLimit();
+          break;
+        }
+        selectedProductIds.add(checkbox.value);
+      }
+    } else {
+      productSelectCheckboxes.forEach((checkbox) => selectedProductIds.delete(checkbox.value));
+      productSelectionError.hidden = true;
+    }
+    syncProductSelection();
+  });
+}
+
+compareSelectedProducts.addEventListener("click", () => {
+  const selectedIds = [...selectedProductIds];
+  if (selectedIds.length < 2 || selectedIds.length > 5) return;
+  window.open("https://coolpc-track.xthy.work/compare?ids=" + selectedIds.join(","), "_blank", "noopener,noreferrer");
+});
+
+mergeSelectedProducts.addEventListener("click", () => {
+  const selectedIds = [...selectedProductIds];
+  if (selectedIds.length < 2 || selectedIds.length > 5) return;
+  window.open(window.location.origin + "/merge?ids=" + selectedIds.join(","), "_blank", "noopener,noreferrer");
+});
+
+syncProductSelection();
 
 const jumpPageInput = document.getElementById('jumpPageInput');
 if (jumpPageInput) {

@@ -82,6 +82,43 @@ def test_products_page_shows_required_columns():
     assert "2026-02-01" in resp.text
 
 
+def test_products_page_renders_selection_controls_for_each_product():
+    client, Session_ = _make_client()
+    _seed_many_products(Session_, 3)
+    product_ids = [1, 2, 3]
+
+    resp = client.get("/products")
+
+    assert resp.status_code == 200
+    table_start = resp.text.find('<table id="adminProductsTable">')
+    table_end = resp.text.find("</table>", table_start)
+    table_html = resp.text[table_start:table_end]
+    assert 'id="selectAllProducts"' in table_html
+    for product_id in product_ids:
+        assert f'class="productSelectCheckbox" value="{product_id}"' in table_html
+    actions_start = resp.text.find('id="productBatchActions"')
+    actions_end = resp.text.find("</div>", actions_start)
+    actions_html = resp.text[actions_start:actions_end]
+    assert ">比較所選商品<" in actions_html
+    assert ">合併所選商品<" in actions_html
+
+
+def test_products_page_selection_actions_open_safe_new_tabs():
+    client, _Session_ = _make_client()
+
+    resp = client.get("/products")
+
+    selection_start = resp.text.find("const productSelectionStorageKey")
+    selection_end = resp.text.find("const jumpPageInput", selection_start)
+    selection_script = resp.text[selection_start:selection_end]
+    assert "compareSelectedProducts.addEventListener(\"click\"" in selection_script
+    assert "mergeSelectedProducts.addEventListener(\"click\"" in selection_script
+    assert "https://coolpc-track.xthy.work/compare" in selection_script
+    assert 'window.location.origin + "/merge?ids="' in selection_script
+    assert "window.open(" in selection_script
+    assert "noopener,noreferrer" in selection_script
+
+
 def test_products_page_search_input_is_wide_with_button_beside():
     client, _Session_ = _make_client()
     resp = client.get("/products")

@@ -186,6 +186,25 @@ th, td { padding: 8px var(--space-3); }
 .detail-list dd.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 #adminProductsTable { table-layout: fixed; }
+#adminProductsTable .col-select { width: 44px; text-align: center; }
+#adminProductsTable .col-select input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.batch-actions__error { color: var(--up); }
+.batch-actions__buttons { display: flex; gap: var(--space-2); margin-left: auto; }
+@media (max-width: 640px) {
+  .batch-actions { flex-wrap: wrap; }
+  .batch-actions__buttons { width: 100%; margin-left: 0; }
+}
 #adminProductsTable th { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #adminProductsTable th .col-resizer {
   position: absolute;
