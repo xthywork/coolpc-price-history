@@ -176,8 +176,10 @@ def compare_page(request: Request, ids: str | None = None, session: Session = De
         except ValueError:
             product_ids = []
             error = "ids 格式錯誤，請輸入逗號分隔的商品 ID"
-        if error is None and not (2 <= len(product_ids) <= 5):
-            error = "請選擇 2 到 5 個商品進行比較"
+        if error is None and len(set(product_ids)) != len(product_ids):
+            error = "商品 ID 不可重複"
+        if error is None and not (2 <= len(product_ids) <= 20):
+            error = "請選擇 2 到 20 個商品進行比較"
         if error is None:
             for pid in product_ids:
                 product = session.get(Product, pid)

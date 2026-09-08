@@ -152,6 +152,12 @@ def test_products_page_selection_actions_open_safe_new_tabs():
     assert 'window.location.origin + "/merge?ids="' in selection_script
     assert "window.open(" in selection_script
     assert "noopener,noreferrer" in selection_script
+    assert "selectedProductIds.size < 20" in selection_script
+    assert "selectedProductIds.size >= 20" in selection_script
+    assert "compareSelectedProducts.disabled = selectedCount < 2;" in selection_script
+    assert "mergeSelectedProducts.disabled = selectedCount < 2 || selectedCount > 5;" in selection_script
+    assert "selectedIds.length < 2 || selectedIds.length > 20" in selection_script
+    assert "selectedIds.length < 2 || selectedIds.length > 5" in selection_script
 
 
 def test_products_page_search_input_is_wide_with_button_beside():

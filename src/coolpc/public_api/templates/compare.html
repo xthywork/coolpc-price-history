@@ -8,12 +8,12 @@
 
 <form method="get" action="/compare" id="compareIdsForm">
   <div class="picker" id="comparePickerBox">
-    <input type="text" id="compareSearchInput" placeholder="搜尋商品名稱加入比較，最多 5 個" autocomplete="off">
+    <input type="text" id="compareSearchInput" placeholder="搜尋商品名稱加入比較，最多 20 個" autocomplete="off">
     <div class="picker__results" id="compareSearchResults" hidden></div>
   </div>
   <div class="compare-list" id="compareChips">
     {% for item in items %}
-    <span class="compare-chip series-{{ loop.index }}" data-id="{{ item.product.id }}">
+    <span class="compare-chip series-{{ (loop.index0 % 5) + 1 }}" data-id="{{ item.product.id }}">
       <span class="compare-chip__name">{{ item.product.current_name }}</span>
       <button type="button" class="compare-chip__remove" title="移除" aria-label="移除">✕</button>
     </span>
@@ -44,7 +44,7 @@
       {% for item in items %}
       <tr>
         <td>
-          <span class="series-swatch series-{{ loop.index }}"></span>
+          <span class="series-swatch series-{{ (loop.index0 % 5) + 1 }}"></span>
           <a href="/products/{{ item.product.id }}">{{ item.product.current_name }}</a>
         </td>
         <td class="col-num">{{ "{:,}".format(item.product.current_price) }}</td>
@@ -80,7 +80,7 @@
 <script src="/static/js/chart-theme.js"></script>
 <script>
 (function () {
-  const MAX_CHIPS = 5;
+  const MAX_CHIPS = 20;
   const searchInput = document.getElementById('compareSearchInput');
   const resultsBox = document.getElementById('compareSearchResults');
   const chipsBox = document.getElementById('compareChips');
@@ -99,7 +99,7 @@
     // 色票是照清單順序給的，移除中間一個之後要重編，否則畫面上的顏色會
     // 跟送出後圖表上的顏色對不起來
     chipsBox.querySelectorAll('.compare-chip').forEach((chip, i) => {
-      chip.className = 'compare-chip series-' + (i + 1);
+      chip.className = 'compare-chip series-' + ((i % 5) + 1);
     });
   }
 

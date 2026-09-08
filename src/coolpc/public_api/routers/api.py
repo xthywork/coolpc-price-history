@@ -149,8 +149,10 @@ def compare_products(ids: str, session: Session = Depends(get_session)):
         product_ids = [int(x) for x in ids.split(",") if x.strip()]
     except ValueError:
         raise HTTPException(status_code=400, detail="ids 格式錯誤，需為逗號分隔的整數")
-    if not (2 <= len(product_ids) <= 5):
-        raise HTTPException(status_code=400, detail="比較商品數量需介於 2 到 5 個之間")
+    if len(set(product_ids)) != len(product_ids):
+        raise HTTPException(status_code=400, detail="商品 ID 不可重複")
+    if not (2 <= len(product_ids) <= 20):
+        raise HTTPException(status_code=400, detail="比較商品數量需介於 2 到 20 個之間")
 
     items: list[schemas.CompareItem] = []
     series: list[schemas.ComparePricePoint] = []

@@ -57,9 +57,29 @@ def test_compare_rejects_too_few_ids():
 def test_compare_rejects_too_many_ids():
     client, Session_ = _make_client()
     t = datetime.datetime(2026, 2, 1)
-    ids = [_seed(Session_, f"P{i}", 100 + i, t) for i in range(6)]
+    ids = [_seed(Session_, f"P{i}", 100 + i, t) for i in range(21)]
     resp = client.get("/api/compare", params={"ids": ",".join(str(i) for i in ids)})
     assert resp.status_code == 400
+
+
+def test_compare_rejects_duplicate_ids():
+    client, Session_ = _make_client()
+    pid = _seed(Session_, "重複比較商品", 100, datetime.datetime(2026, 2, 1))
+
+    resp = client.get("/api/compare", params={"ids": f"{pid},{pid}"})
+
+    assert resp.status_code == 400
+
+
+def test_compare_accepts_twenty_ids():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    ids = [_seed(Session_, f"P{i}", 100 + i, t) for i in range(20)]
+
+    resp = client.get("/api/compare", params={"ids": ",".join(str(i) for i in ids)})
+
+    assert resp.status_code == 200
+    assert {item["id"] for item in resp.json()["items"]} == set(ids)
 
 
 def test_compare_returns_items_and_series():

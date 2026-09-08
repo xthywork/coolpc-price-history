@@ -410,13 +410,13 @@ def test_base_layout_has_compare_clear_control():
     assert "clear()" in resp.text
 
 
-def test_base_layout_compare_js_has_cap_at_5_logic_and_clear_method():
+def test_base_layout_compare_js_has_cap_at_20_logic_and_clear_method():
     client, _Session_ = _make_client()
     resp = client.get("/")
     assert resp.status_code == 200
-    # cap-at-5：加入前檢查目前清單長度，達到 5 個時拒絕加入並跳出提示
-    assert "ids.length >= 5" in resp.text
-    assert "比較清單最多 5 個商品" in resp.text
+    # cap-at-20：加入前檢查目前清單長度，達到 20 個時拒絕加入並跳出提示
+    assert "ids.length >= 20" in resp.text
+    assert "比較清單最多 20 個商品" in resp.text
     # clear() 方法：清空清單並更新導覽列
     assert "clear() {" in resp.text
     assert "this._write([]);" in resp.text

@@ -78,9 +78,49 @@ def test_compare_page_prefills_chips_with_names_not_ids_for_existing_selection()
 
 def test_compare_page_shows_error_for_invalid_count():
     client, _ = _make_client()
-    resp = client.get("/compare", params={"ids": "1"})
+    resp = client.get("/compare", params={"ids": ",".join(str(i) for i in range(1, 22))})
     assert resp.status_code == 200
-    assert "請選擇 2 到 5 個商品" in resp.text
+    assert "請選擇 2 到 20 個商品" in resp.text
+
+
+def test_compare_page_shows_error_for_duplicate_ids():
+    client, _ = _make_client()
+
+    resp = client.get("/compare", params={"ids": "1,1"})
+
+    assert resp.status_code == 200
+    assert "商品 ID 不可重複" in resp.text
+
+
+def test_compare_page_renders_twenty_products_with_cycling_series_classes():
+    client, Session_ = _make_client()
+    t = datetime.datetime(2026, 2, 1)
+    with Session_() as session:
+        cat = Category(name="顯示卡VGA")
+        sub = Subcategory(name="NVIDIA", category=cat)
+        session.add_all([cat, sub])
+        session.flush()
+        products = []
+        for i in range(20):
+            product = Product(
+                category_id=cat.id, subcategory_id=sub.id, current_name=f"二十項比較商品{i}",
+                current_price=1000 + i, is_active=True, last_seen_at=t, created_at=t,
+            )
+            session.add(product)
+            products.append(product)
+        session.flush()
+        product_ids = [product.id for product in products]
+        session.commit()
+
+    resp = client.get("/compare", params={"ids": ",".join(str(product_id) for product_id in product_ids)})
+
+    assert resp.status_code == 200
+    assert "二十項比較商品0" in resp.text
+    assert "二十項比較商品19" in resp.text
+    assert resp.text.count('class="compare-chip series-1"') == 4
+    assert resp.text.count('class="series-swatch series-1"') == 4
+    assert resp.text.count('class="compare-chip series-5"') == 4
+    assert resp.text.count('class="series-swatch series-5"') == 4
 
 
 def test_compare_page_renders_table_and_chart_for_valid_ids():
