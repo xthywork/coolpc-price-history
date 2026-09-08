@@ -141,7 +141,7 @@ function syncProductSelection() {
     checkbox.checked = selectedProductIds.has(checkbox.value);
   });
   const selectedCount = selectedProductIds.size;
-  selectedProductsCount.textContent = `已選擇  個商品`;
+  selectedProductsCount.textContent = `已選擇 ${selectedCount} 個商品`;
   compareSelectedProducts.disabled = selectedCount < 2;
   mergeSelectedProducts.disabled = selectedCount < 2;
   if (selectAllProducts) {

@@ -103,6 +103,18 @@ def test_products_page_renders_selection_controls_for_each_product():
     assert ">合併所選商品<" in actions_html
 
 
+def test_products_page_sync_selection_shows_selected_count():
+    client, _Session_ = _make_client()
+
+    resp = client.get("/products")
+
+    sync_start = resp.text.find("function syncProductSelection()")
+    sync_end = resp.text.find("function showProductSelectionLimit", sync_start)
+    sync_function = resp.text[sync_start:sync_end]
+    assert "const selectedCount = selectedProductIds.size;" in sync_function
+    assert 'selectedProductsCount.textContent = `已選擇 ${selectedCount} 個商品`;' in sync_function
+
+
 def test_products_page_selection_actions_open_safe_new_tabs():
     client, _Session_ = _make_client()
 
