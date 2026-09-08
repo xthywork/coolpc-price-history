@@ -2,8 +2,8 @@ import datetime
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from coolpc.db.models import Base, Category, Subcategory, Product, ProductName, PriceHistory
-from coolpc.merging.service import merge_products, undo_merge, MergeError
+from coolpc.db.models import Base, Category, Subcategory, Product, ProductName, PriceHistory, MergeLog
+from coolpc.merging.service import merge_products, merge_products_batch, undo_merge, MergeError
 
 def _session():
     engine = create_engine("sqlite:///:memory:")
@@ -79,6 +79,72 @@ def test_merge_into_already_merged_target_raises():
 
     with pytest.raises(MergeError):
         merge_products(session, third.id, source.id)  # source 已被合併，不可再當 target
+
+
+def test_batch_merge_merges_multiple_sources_into_specified_target():
+    session = _session()
+    source_a, target = _setup_two_products(session)
+    t = datetime.datetime(2026, 2, 2)
+    source_b = Product(
+        category_id=target.category_id,
+        subcategory_id=target.subcategory_id,
+        current_name="第三個商品",
+        current_price=100,
+        is_active=False,
+        last_seen_at=t,
+        created_at=t,
+    )
+    session.add(source_b)
+    session.flush()
+    session.add(ProductName(
+        product_id=source_b.id,
+        name="第三個商品",
+        first_seen_at=t,
+        last_seen_at=t,
+    ))
+    session.commit()
+
+    logs = merge_products_batch(session, [source_a.id, source_b.id], target.id, now=t)
+
+    assert len(logs) == 2
+    assert source_a.merged_into_id == target.id
+    assert source_b.merged_into_id == target.id
+    assert [log.target_product_id for log in logs] == [target.id, target.id]
+
+
+def test_batch_merge_prevalidates_all_sources_before_caller_rollback():
+    session = _session()
+    source_a, target = _setup_two_products(session)
+    t = datetime.datetime(2026, 2, 2)
+    merged_source = Product(
+        category_id=target.category_id,
+        subcategory_id=target.subcategory_id,
+        current_name="已合併商品",
+        current_price=100,
+        is_active=False,
+        last_seen_at=t,
+        created_at=t,
+        merged_into_id=target.id,
+    )
+    session.add(merged_source)
+    session.flush()
+    session.add(ProductName(
+        product_id=merged_source.id,
+        name="已合併商品",
+        first_seen_at=t,
+        last_seen_at=t,
+    ))
+    session.commit()
+
+    with pytest.raises(MergeError):
+        merge_products_batch(session, [source_a.id, merged_source.id], target.id, now=t)
+
+    assert source_a.merged_into_id is None
+    assert session.query(MergeLog).count() == 0
+    session.rollback()
+
+    assert source_a.merged_into_id is None
+    assert session.query(MergeLog).count() == 0
 
 def test_undo_merge_restores_original_state():
     session = _session()

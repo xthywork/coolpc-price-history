@@ -55,6 +55,35 @@ def merge_products(session: Session, source_id: int, target_id: int,
     return merge_log
 
 
+def merge_products_batch(
+    session: Session,
+    source_ids: list[int],
+    target_id: int,
+    now: datetime.datetime | None = None,
+) -> list[MergeLog]:
+    if not source_ids:
+        raise MergeError("至少需要一個來源商品")
+    if len(source_ids) != len(set(source_ids)):
+        raise MergeError("來源商品不可重複")
+    if target_id in source_ids:
+        raise MergeError("來源與目標商品不可相同")
+    if not 2 <= len(source_ids) + 1 <= 5:
+        raise MergeError("合併商品總數必須介於 2 至 5 個")
+
+    products = {product_id: session.get(Product, product_id) for product_id in source_ids + [target_id]}
+    if any(product is None for product in products.values()):
+        raise MergeError("來源或目標商品不存在")
+    if any(products[source_id].merged_into_id is not None for source_id in source_ids):
+        raise MergeError("來源商品已被合併過，請先 Undo 再重新合併")
+    if products[target_id].merged_into_id is not None:
+        raise MergeError("目標商品本身已被合併到其他商品，請改選最終商品作為目標")
+
+    return [
+        merge_products(session, source_id, target_id, now=now)
+        for source_id in source_ids
+    ]
+
+
 def undo_merge(session: Session, merge_log_id: int) -> None:
     merge_log = session.get(MergeLog, merge_log_id)
     if merge_log is None:
