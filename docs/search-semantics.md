@@ -10,7 +10,7 @@
 
 查詢字串以空白分隔成多個 token。
 
-### AND（預設，`q_match="and"`）
+### AND（頁面與自動完成的固定語意；API 預設 `q_match="and"`）
 
 **每個 token 都必須各自命中，不要求整段查詢字串本身連續出現。**
 
@@ -25,19 +25,32 @@
 - ❌ 不命中「ZOTAC GT730 2GB Zone Edition」——雖然「ZOTAC」有命中，但整個
   名稱完全不含「3050」，AND 語意要求每個 token 都命中，一個沒中就整體排除。
 
-這是**全站唯一**使用的商品名稱搜尋語意，包含：
-- 公開搜尋首頁（`GET /`，`src/coolpc/public_api/routers/pages.py`）
-- 公開 JSON API `GET /api/products`（`q_match` 參數預設值就是 `"and"`）
-- 管理後台商品搜尋頁、商品搜尋 JSON（`GET /products/search-json`）——這兩處
-  在程式碼裡是**寫死**用 AND（`SearchFilters(q=q, q_match="and", ...)`），
-  不像 `/api/products` 一樣可用 `q_match` 參數切換
+下列介面預設或固定使用 AND：
 
-### OR（`q_match="or"`，僅 `/api/products` 可選用）
+- 公開搜尋首頁（`GET /`，`src/coolpc/public_api/routers/pages.py`）
+- 公開 JSON API `GET /api/products`（`q_match` 預設為 `"and"`）
+- 管理後台商品搜尋頁固定傳入 `q_match="and"`；商品搜尋 JSON
+  （`GET /products/search-json`）呼叫 `search_products_and()`，兩者都沒有切換入口
+
+### OR（僅 `/api/products` 可選用）
 
 任一 token 命中即算符合，同時**額外**保留「整段查詢字串本身」的比對（例如
 名稱本身就含空白，如「RTX 5070」，仍要能整段字串命中）。這是較寬鬆的瀏覽/
-篩選模式，**非預設值**，只能透過公開 API `GET /api/products?q_match=or` 明確
-選用；公開搜尋頁的 UI 與管理後台一律固定使用 AND，沒有切換 OR 的入口。
+篩選模式，**非預設值**。公開 API 的 `q_match` 是一般字串，只有精確等於
+`"and"` 才使用 AND；`"or"` 以及其他任何字串都落入 OR 分支，沒有值域驗證。
+公開搜尋頁與管理後台固定使用 AND，沒有切換 OR 的入口。
+
+## SQL `LIKE` 萬用字元
+
+名稱 token 與 `model` 篩選皆直接包成 `LIKE %輸入值%`，沒有逸出萬用字元。
+因此輸入 `%` 可比對任意長度字串，`_` 可比對單一字元；它們不是按字面
+搜尋。此邊界同時適用 AND、OR 與自動完成。
+
+## 1 元項目
+
+公開搜尋頁、`GET /api/products` 與公開自動完成都排除目前價格剛好為
+`1` 元的項目（原價屋的公告等非商品內容）；管理後台搜尋與
+`GET /products/search-json` 不排除，供管理者查找與編輯。
 
 ## 自動完成 / 精確挑選（`search_products_and`）
 

@@ -3,7 +3,8 @@
 ## 與原始設計文件的差異
 
 [`docs/superpowers/specs/2026-09-02-coolpc-price-history-design.md`](superpowers/specs/2026-09-02-coolpc-price-history-design.md)
-是專案初期的設計文件，`docs/superpowers/plans/` 下三份是對應的實作計畫，
+是專案初期的設計文件；初期及後續的實作規劃收錄於
+[`docs/superpowers/plans/`](superpowers/plans/)。
 兩者都是**歷史留存的規劃紀錄**，記錄當時的設計決策與理由，之後不再回頭修改
 （改了就失去了「當初規劃了什麼」的紀錄價值）。系統實際落地後經過多輪需求
 調整，下列幾點目前的實際行為已經跟原始設計文件不同，以本文件與
@@ -17,14 +18,15 @@
   [`docs/database-schema.md`](database-schema.md#已移除的欄位請勿重新加回)。
 - **搜尋預設語意是 AND，不是 OR**——原始設計的空白分隔搜尋是 OR 語意（任一
   片段命中即符合），後續依需求改為預設 AND（每個片段都要命中），OR 僅在
-  `/api/products` 保留為明確選用的選項。見
+  `/api/products` 可用 `q_match` 切換；其非 `and` 值都走 OR。見
   [`docs/search-semantics.md`](search-semantics.md)。
 - **公開搜尋頁的分頁機制**已從簡易的上一頁/下一頁，改為數字頁碼（含省略號）
   + 可指定每頁筆數（10/20/50/100/500/1000/全部）+ 直接跳頁 + 切換每頁筆數
   時保留捲動位置。
-- **管理後台的商品詳細/編輯頁與分類新增功能**（`GET /products/{id}`、
-  `POST /products/{id}`、`POST /categories`）是原始計畫之後才新增的能力，
-  原始設計/計畫文件中沒有涵蓋，見 [`docs/admin-guide.md`](admin-guide.md)。
+- **管理後台的商品詳細/編輯頁與分類新增功能**（`GET /products/{product_id}`、
+  `POST /products/{product_id}`、`POST /categories`）是初期設計之後才新增的能力，
+  見 [`docs/admin-guide.md`](admin-guide.md)；公開 JSON 路由見
+  [`docs/api-reference.md`](api-reference.md)。
 - **分類顯示名稱（`Category.display_name`）與排序（`sort_order`）機制**
   （migration `0004`、`0005`）同樣是原始設計之後才新增。
 
@@ -79,31 +81,30 @@ chip 挑選器、商品編輯頁的分類/子分類連動下拉選單）都是�
 不必要的單點故障。
 
 `GET /api/products/sparklines` 批次供應多個商品的取樣價格點（見
-`stats/service.py` 的 `get_sparkline_points`）：先取最近 N 天，該期間沒有
-資料的商品（例如早就下架的）改取它自己最後幾筆，整批只發兩次查詢，一次
-最多接受 100 個商品。搜尋頁曾經用它畫每列的迷你走勢圖，後來走勢欄依需求
-移除，這個端點現在只作為公開 JSON API 的一部分，沒有前端使用者。
+`stats/service.py` 的 `get_sparkline_points`）：先取最近 N 天，個別商品不足
+2 筆時回退取歷史尾端價格。批次查詢價格可避免逐商品查詢，但總查詢數還包含
+合併群組展開及 API 的商品可見性檢查；一次最多接受 100 個 id。搜尋頁的
+迷你走勢欄已移除，目前前端不使用此端點。詳見
+[`docs/api-reference.md`](api-reference.md)。
 
 ## 資料流：抓取 → 解析 → 寫入 → 服務
 
 ```
-fetch_html()          scraper/fetcher.py
+fetch_html()           scraper/fetcher.py
   │  httpx GET COOLPC_EVALUATE_URL（預設 https://coolpc.com.tw/evaluate.php）
-  │  失敗 → FetchError → ScrapeSnapshot(status="failed")
+  │  失敗 → failed；沒有原始 HTML，raw_html_path=None
   ▼
-save_raw_html()        依估價時間存到 data/raw_html/YYYY/MM/DD/*.html
-  │                     （檔名衝突時自動加 -1/-2... 後綴，原始檔案永不覆蓋）
-  ▼
-parse_html()            parser/html_parser.py
+parse_html()           parser/html_parser.py
   │  decode_html(): cp950/Big5 解碼（原站編碼）
   │  parse_fetched_at(): 從 #Mdy 節點解析估價時間（HTML 內嵌時間戳，
   │                       不是抓取當下的系統時間——這點很重要：補匯歷史
   │                       檔案、或抓取當下網路延遲，都不會扭曲時間序列）
   │  parse_products(): 走訪 #tbdy 底下每個分類 <tr> 的 <select>，
   │                     逐一切出「名稱, $價格 標記」文字並解析
-  │  失敗 → ParseError → ScrapeSnapshot(status="failed")，
-  │         但仍會先保存原始 HTML（raw_html_path 不為 None），
-  │         方便事後用保存下來的 HTML 除錯或補寫解析規則
+  │  失敗 → 按系統時間保存原始 HTML → failed；保留檔案路徑供除錯
+  ▼
+save_raw_html()        解析成功後按 HTML 估價時間保存到
+  │                     data/raw_html/YYYY/MM/DD/*.html；撞名加 -1/-2...，不覆蓋
   ▼
 ingest_snapshot()       ingest/service.py
   │  idempotent：同一個 fetched_at 若已有 success/partial 紀錄，
@@ -118,12 +119,22 @@ ingest_snapshot()       ingest/service.py
   │      price_history
   │  收尾：本次快照沒出現、目前仍 is_active 的既有商品標記下架
   │        （partial 快照跳過這步）
+  │  沒有時序保護：補匯舊快照可能讓目前價格/狀態/last_seen_at 倒退，
+  │  並把只在較新快照出現、目前上架的商品標記下架
   ▼
    data/coolpc.db（WAL 模式，讀寫並行）
   │
   ├──▶ public_api：搜尋、詳細頁、比較頁、JSON API
   └──▶ admin_api：抓取狀態、原始 HTML 封存、商品編輯、合併
 ```
+
+`import-html`/`import-dir` 不呼叫 `save_raw_html()`；新建的成功或失敗紀錄
+直接保存呼叫者提供的來源路徑。若相同 `fetched_at` 已有 success/partial
+快照，重匯會直接回傳既有紀錄，不重新處理，也不以新路徑取代原有的
+`raw_html_path`。搬動紀錄所指的來源檔後，後台封存檢視會失效。
+成功及 partial 快照的 `fetched_at` 來自 HTML，failed 紀錄的 `fetched_at`
+來自系統時間；詳細欄位與失敗分支見
+[`docs/database-schema.md`](database-schema.md#scrape_snapshots)。
 
 ### 商品比對：完全等值，沒有模糊比對
 

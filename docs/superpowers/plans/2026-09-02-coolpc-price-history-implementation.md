@@ -1,5 +1,8 @@
 # 原價屋歷史價格查詢系統 Implementation Plan
 
+> **歷史文件／非現行待辦：**本文保留當時的實作規劃；文內狀態與核取清單
+> 不代表目前實作進度或待辦。查現況請看 [文件索引](../../README.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 建立可執行的原價屋歷史價格查詢系統：定期抓取原價屋估價頁 HTML、

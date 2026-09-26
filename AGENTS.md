@@ -1,8 +1,8 @@
 # AGENTS.md — 給接手這個專案的 agent
 
 這份文件記錄**讀原始碼看不出來的慣例與地雷**。系統功能說明請看
-[`README.md`](README.md) 與 [`docs/`](docs/)；這裡只寫「動手之前必須先知道
-的事」。
+[`README.md`](README.md) 與 [`docs/README.md`](docs/README.md)；這裡只寫
+「動手之前必須先知道的事」。
 
 ## 先讀這個
 
@@ -11,7 +11,7 @@
 | 這是什麼 | 從原價屋估價頁定期抓價、永久保存原始 HTML、提供歷史價格查詢與管理後台 |
 | 語言 | **所有介面文案、文件、commit 訊息一律繁體中文** |
 | 開發流程 | TDD：先寫失敗的測試 → 實作 → 跑該檔測試 → **commit 前跑完整套件** |
-| 跑測試 | `uv run pytest`（目前約 226 個，約 6 分鐘；數字會變動，實際數量用 `uv run pytest --collect-only -q` 確認） |
+| 跑測試 | `uv run pytest`；目前收集數量以 `uv run pytest --collect-only -q` 確認，不固定寫在文件中 |
 | 前端 | Jinja2 伺服端渲染 + 原生 JS，**沒有框架、沒有 npm、沒有建置步驟** |
 | 資料庫 | SQLite（WAL 模式），schema 只透過 Alembic 變更 |
 | 本機服務 | user-level systemd，**所有指令都要加 `--user`**（見最後一節） |
@@ -71,16 +71,18 @@ Starlette 依**註冊順序**比對路徑樣板，先中先贏。`/products/{pro
 
 新增任何 `/products/<字串>` 路由時，一律加在動態路由**上面**。
 
-### 2. 時間戳一律來自 HTML，不是系統時鐘
+### 2. 成功快照的估價時間來自 HTML；失敗紀錄例外
 
 `parser/html_parser.py:17` 的 `parse_fetched_at()` 讀 HTML 裡的 `#Mdy`
 元素，解析出原價屋自己的估價時間。抓不到就丟 `ParseError`，**不會退而用
 系統時間**。
 
-`scrape_snapshots.created_at` 是全系統**唯一**的系統時鐘欄位（紀錄寫入
-時間，稽核用）。其餘所有時間欄位（`fetched_at`、`scraped_at`、
-`last_seen_at`、`products.created_at`、`product_names.*_seen_at`）都是估價
-時間。
+`scrape_snapshots.created_at` 記錄寫入時間，採系統時間；**失敗**的
+`scrape_snapshots.fetched_at` 也採系統時間（見 `scraper/run.py` 的
+`_record_failure()`）。**成功／partial** 快照的 `fetched_at`，以及
+`price_history.scraped_at`、`products.last_seen_at`、
+`products.created_at`、`product_names.*_seen_at` 都採 HTML 估價時間。
+解析器本身不會在缺少 HTML 估價時間時改用系統時間。
 
 實際落差可能很大：檔名 `2026-09-01-00-00.html`（下載時間）的內嵌估價時間
 可能是 `2026-08-31 19:33`。
@@ -104,6 +106,8 @@ Starlette 依**註冊順序**比對路徑樣板，先中先贏。`/products/{pro
 所以：**先把檔案搬到最終位置，再匯入**。匯入後搬動或刪除來源檔，封存檢視
 就會壞掉。
 
+<a id="hazard-5"></a>
+
 ### 5. 下架判定沒有時序保護 ⚠️ 最容易造成資料錯亂
 
 `ingest/service.py:170` 起，會把「目前 `is_active=True` 但不在這次快照裡」
@@ -118,6 +122,11 @@ Starlette 依**註冊順序**比對路徑樣板，先中先贏。`/products/{pro
 
 **修法**：讓最新的快照最後被處理。
 
+操作前先停排程並確認沒有其他抓取或匯入程序。依 `fetched_at` 找出目前最新的
+`success`／`partial` 快照，記下其 ID，並確認該筆 `raw_html_path` 指向的
+原始 HTML 仍可讀；**確認後**才能移除該筆快照及其價格紀錄。備份檔路徑也須
+先確認不存在，不可覆蓋舊備份。下方 `<id>` 與檔案路徑須替換成剛核對的值。
+
 ```bash
 # 1. 先備份（見地雷 6）
 sqlite3 data/coolpc.db "VACUUM INTO '/tmp/before.db'"
@@ -129,6 +138,10 @@ uv run coolpc-scraper import-dir <dir>
 # 4. 最後重匯剛才刪掉那份已封存的 HTML，讓它落在最後
 uv run coolpc-scraper import-html data/raw_html/YYYY/MM/DD/<file>.html
 ```
+
+重匯後確認最新快照已重新處理，並抽查 `current_price`、
+`current_status`、`is_active`、`last_seen_at` 是否符合最新 HTML；
+尤其確認只在最新快照出現的商品沒有被誤標下架，核對後再恢復排程。
 
 注意「再跑一次抓取」通常**修不好**：如果原價屋還沒更新估價時間，新抓到的
 快照會因為地雷 3 的冪等判斷被跳過。
@@ -153,8 +166,9 @@ sqlite3 data/coolpc.db "VACUUM INTO '/path/to/backup.db'"
 用）。目前 head 是 `0007_drop_product_first_seen_at`。
 
 新增 migration 後，先在快照上試跑再套用到正式庫，流程見
-[`docs/deployment.md`](docs/deployment.md)。SQLite 的 ALTER 能力有限，改欄
-位請用 `op.batch_alter_table()`。
+[`docs/deployment.md`](docs/deployment.md)。SQLite 對需要重建表或不支援的
+ALTER 操作，使用 `op.batch_alter_table()`；一般新增欄位可直接用
+`op.add_column()`，詳見 [`docs/development.md`](docs/development.md)。
 
 ### 8. 不要把已刪除的欄位加回來
 

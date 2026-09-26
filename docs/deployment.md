@@ -13,8 +13,14 @@
 | `coolpc-public.service` | simple，常駐 | `uvicorn coolpc.public_api.app:app --host 0.0.0.0 --port 33690`，`Restart=on-failure` |
 | `coolpc-admin.service` | simple，常駐 | `uvicorn coolpc.admin_api.app:app --host 0.0.0.0 --port 33691`，`Restart=on-failure` |
 
-四份 unit 檔案都在 `deploy/`，內建路徑假設安裝在 `/opt/coolpc-price-history`、
-執行帳號為 `coolpc`；不同環境請先修改再複製到 `/etc/systemd/system/`。
+`deploy/` 的四份 unit 是**系統層級部署範本**，假設安裝在
+`/opt/coolpc-price-history`、執行帳號為 `coolpc`；不同環境請先修改再複製到
+`/etc/systemd/system/`。以下未加 `--user` 的操作指令只適用於這種部署。
+**本專案目前這台機器使用的是使用者層級 unit**（位於
+`~/.config/systemd/user/`），不是 `deploy/` 內的範本；在這台機器上請把
+`sudo systemctl ...` 改為 `systemctl --user ...`，`journalctl ...` 改為
+`journalctl --user ...`，且不要操作 `/etc/systemd/system/`。兩種方式的設定
+與指令不可混用，詳見 [README 的 systemd 部署段落](../README.md#systemd-部署)。
 
 ## 日誌檢查
 
@@ -56,7 +62,7 @@ checkpoint 回主檔案 `coolpc.db`。**如果直接用 `cp`/`rsync` 只複製
    `coolpc.db-wal`、`coolpc.db-shm` 一起複製）——這是最單純可靠的方式，
    適合排定的維護窗口。
 2. **服務仍在運作、需要線上取得一致快照時**，用 SQLite 自己的
-   `VACUUM INTO`（會自動處理 WAL 合併，產生一份內容一致、且體積較精簡的
+   `VACUUM INTO`（會讀取包含 WAL 中已提交交易的一致資料，產生一份體積較精簡的
    單一檔案快照）：
 
    ```bash
@@ -74,42 +80,91 @@ checkpoint 回主檔案 `coolpc.db`。**如果直接用 `cp`/`rsync` 只複製
 schema migration 時應該照著做，而不是直接在正式資料庫上 `alembic upgrade
 head`：
 
-1. **先停止兩個常駐服務**（避免 migration 執行期間有寫入交易進行中，
-   也避免 uvicorn worker 手上還拿著舊 schema 的 SQLAlchemy 連線繼續跑）：
+以下命令以 `/opt/coolpc-price-history` 的**系統層級部署**為例；先
+`cd /opt/coolpc-price-history`，由可使用 `sudo` 的維運帳號執行。這台機器
+的使用者層級部署須依上節改用 `systemctl --user`，並以實際資料庫路徑及
+擁有該專案的使用者執行 `sqlite3`、Alembic。
+
+1. **停止 timer、正在執行的 scraper service 與兩個常駐服務**。只停止
+   timer 不會中斷已啟動的 oneshot；管理頁也能手動觸發抓取，因此兩個網站
+   服務同樣要停。確認沒有其他手動抓取或匯入程序繼續寫入資料庫：
 
    ```bash
-   sudo systemctl stop coolpc-public.service coolpc-admin.service
+   sudo systemctl stop coolpc-scraper.timer coolpc-public.service coolpc-admin.service
+   sudo systemctl stop coolpc-scraper.service
+   sudo systemctl status coolpc-scraper.timer coolpc-scraper.service
    ```
 
-2. **取一份一致快照**做演練（見上方「WAL 模式下的檔案系統層備份」，服務
-   已停止的話用 `cp` 也可以，習慣用 `VACUUM INTO` 更保險）：
+2. **取一份一致備份，複製一份作演練**（見上方「WAL 模式下的檔案系統層
+   備份」）。備份檔保留不動；目標檔案都必須尚未存在，並要留足備份、
+   演練及 migration 的磁碟空間。以下命令須在同一個 shell 依序執行；
+   任一目標已存在（含懸空符號連結）或備份失敗時即停止：
 
    ```bash
-   sqlite3 data/coolpc.db "VACUUM INTO '/tmp/coolpc-migration-test.db'"
+   set -e
+   for target in data/coolpc-before-migration.db data/coolpc-migration-test.db; do
+     if [ -e "$target" ] || [ -L "$target" ]; then
+       printf '目標已存在，停止操作：%s\n' "$target" >&2
+       exit 1
+     fi
+   done
+   sudo -u coolpc sqlite3 data/coolpc.db "VACUUM INTO 'data/coolpc-before-migration.db'"
+   sudo -u coolpc cp data/coolpc-before-migration.db data/coolpc-migration-test.db
    ```
 
-3. **先在快照上跑一次 migration**，確認語法/邏輯正確、不會出錯，並確認
-   資料列數在 migration 前後一致（尤其是 `DROP COLUMN` 這種在 SQLite 上
-   靠 `batch_alter_table` 重建整張表完成的操作，值得多一層確認）：
+3. **先記下快照的資料列數，再在快照上演練 migration**。執行前先檢視本次
+   migration，列出**每一張受影響的表**（包括會重建的表）；以下三張表只是
+   範例，**不是完整檢查清單**。把每張前後都存在的受影響表加入
+   `counts_sql` 的 migration 前／後列數查詢，並把同一批表加入下方的
+   `PRAGMA table_info` 迴圈，逐一核對 migration 前後的欄位與預期結構。
+   若有意增刪資料列，須先為各表
+   訂出預期列數變化，將範例中的相等檢查改為逐表驗證預期值；新增或刪除
+   整張表時，另行核對該表在 migration 前後的存在狀態、欄位及可查的
+   資料列數。尤其是會重建表的 schema 變更，更要確認資料沒有遺漏。
+   以下兩段在同一個專用 shell 依序執行；`set -e` 讓任一步失敗時停止
+   後續命令：
 
    ```bash
-   COOLPC_DB_PATH=/tmp/coolpc-migration-test.db uv run alembic upgrade head
-   sqlite3 /tmp/coolpc-migration-test.db "SELECT COUNT(*) FROM products;"
-   sqlite3 /tmp/coolpc-migration-test.db "PRAGMA table_info(products);"
+   set -e
+   counts_sql="SELECT 'products', COUNT(*) FROM products UNION ALL SELECT 'price_history', COUNT(*) FROM price_history UNION ALL SELECT 'scrape_snapshots', COUNT(*) FROM scrape_snapshots ORDER BY 1;"
+   before_counts=$(sudo -u coolpc sqlite3 data/coolpc-migration-test.db "$counts_sql")
+   for table in products price_history scrape_snapshots; do
+     printf 'migration 前：%s\n' "$table"
+     sudo -u coolpc sqlite3 data/coolpc-migration-test.db "PRAGMA table_info($table);"
+   done
+   sudo -u coolpc env COOLPC_DB_PATH=data/coolpc-migration-test.db \
+     /opt/coolpc-price-history/.venv/bin/alembic upgrade head
+   after_counts=$(sudo -u coolpc sqlite3 data/coolpc-migration-test.db "$counts_sql")
+   printf 'migration 前：\n%s\nmigration 後：\n%s\n' "$before_counts" "$after_counts"
+   test "$before_counts" = "$after_counts"  # 不相同就停止操作並調查
+   for table in products price_history scrape_snapshots; do
+     printf 'migration 後：%s\n' "$table"
+     sudo -u coolpc sqlite3 data/coolpc-migration-test.db "PRAGMA table_info($table);"
+   done
    ```
 
-4. **快照驗證通過後，才對正式資料庫執行**：
+4. **快照驗證通過後，才對正式資料庫執行**。先確認資料庫仍沒有其他寫入者，
+   再核對正式庫的資料列數與備份基準相同，執行 migration 後再比一次：
 
    ```bash
-   uv run alembic upgrade head
-   sqlite3 data/coolpc.db "SELECT COUNT(*) FROM products;"   # 再次確認列數
+   live_before=$(sudo -u coolpc sqlite3 data/coolpc.db "$counts_sql")
+   test "$before_counts" = "$live_before"  # 不相同就停止操作並調查
+   sudo -u coolpc /opt/coolpc-price-history/.venv/bin/alembic upgrade head
+   live_after=$(sudo -u coolpc sqlite3 data/coolpc.db "$counts_sql")
+   printf '正式庫 migration 前：\n%s\n正式庫 migration 後：\n%s\n' "$live_before" "$live_after"
+   test "$live_before" = "$live_after"  # 不相同就不要啟動服務，先調查
+   for table in products price_history scrape_snapshots; do
+     printf '正式庫 migration 後：%s\n' "$table"
+     sudo -u coolpc sqlite3 data/coolpc.db "PRAGMA table_info($table);"
+   done
    ```
 
-5. **重啟兩個常駐服務**：
+5. **資料列數及 schema 均確認後，重啟兩個常駐服務和 timer**：
 
    ```bash
    sudo systemctl start coolpc-public.service coolpc-admin.service
-   systemctl status coolpc-public.service coolpc-admin.service
+   sudo systemctl start coolpc-scraper.timer
+   sudo systemctl status coolpc-public.service coolpc-admin.service coolpc-scraper.timer
    ```
 
 6. 用實際頁面/API 快速抽查（例如商品列表頁、單一商品詳細頁、剛異動 schema
@@ -117,11 +172,12 @@ head`：
    純 HTTP 層檢查無法發現版面 CSS 衝突之類的問題，只能發現後端邏輯層級的
    錯誤，需要的話仍應實際在瀏覽器操作一次功能路徑。
 
-SQLite 對 `ALTER TABLE ... DROP COLUMN` 的支援因版本而異，本專案的
-migration 一律用 `op.batch_alter_table(...)`（Alembic 的可攜寫法，會建立
-新表、搬移資料、再替換舊表），避免依賴特定 SQLite 版本的原生語法，見
-`migrations/versions/0006_drop_last_change_columns.py`、
-`migrations/versions/0007_drop_product_first_seen_at.py` 兩個實例。
+SQLite 對部分 `ALTER TABLE` 操作有限制。**需要 SQLite 無法直接完成的
+表結構變更**（例如本專案 `0006`、`0007` 的刪欄位操作）可用
+`op.batch_alter_table(...)`；Alembic 在必要時會以建立新表、複製資料、
+替換舊表的方式處理。並非所有 migration 都要用 batch：`0004`、`0005`
+新增欄位時直接使用 `op.add_column(...)`。請依實際操作與 SQLite 支援程度
+選擇，並在快照演練時核對資料列數與欄位。
 
 ## 反向代理與存取限制
 

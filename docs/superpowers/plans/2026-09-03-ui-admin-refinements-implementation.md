@@ -1,5 +1,8 @@
 # UI/Admin 介面調整 Implementation Plan
 
+> **歷史文件／非現行待辦：**本文保留當時的實作規劃；文內狀態與核取清單
+> 不代表目前實作進度或待辦。查現況請看 [文件索引](../../README.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 調整原價屋歷史價格查詢系統既有的管理介面（合併商品流程）與公開查詢介面（搜尋、商品詳情、比較），依使用者確認過的規格逐項改造，不新增資料庫欄位、不變更核心資料模型。

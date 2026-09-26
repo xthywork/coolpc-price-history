@@ -11,7 +11,7 @@
 
 - **要動這個專案的程式碼（人或 agent）請先讀 [`AGENTS.md`](AGENTS.md)**：
   開發慣例與踩過的地雷（路由註冊順序、匯入時序、WAL 備份等）。
-- 完整文件索引：[`docs/`](docs/)
+- 完整文件索引：[`docs/README.md`](docs/README.md)
 - 原始設計文件（初版，部分內容已隨系統演進而過時，見
   [`docs/architecture.md`](docs/architecture.md) 開頭的「與原始設計文件的差異」）：
   [`docs/superpowers/specs/2026-09-02-coolpc-price-history-design.md`](docs/superpowers/specs/2026-09-02-coolpc-price-history-design.md)
@@ -59,39 +59,12 @@ public_api（0.0.0.0:33690）      admin_api（0.0.0.0:33691）
 
 ## 安裝
 
-```bash
-git clone <此專案的 git remote URL> /opt/coolpc-price-history
-cd /opt/coolpc-price-history
-```
-
-建議建立一個專用系統帳號執行本服務（非必要，但符合最小權限原則）：
-
-```bash
-sudo useradd -r -s /usr/sbin/nologin coolpc
-sudo chown -R coolpc:coolpc /opt/coolpc-price-history
-```
-
-安裝 uv：
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.local/bin/env
-```
-
-建立 venv 並安裝相依套件：
-
-```bash
-cd /opt/coolpc-price-history
-uv venv
-uv sync
-```
-
-初始化資料庫（在 `data/coolpc.db` 建立所有資料表，執行到目前最新的
-migration）：
-
-```bash
-uv run alembic upgrade head
-```
+系統層級部署（`/opt/coolpc-price-history`、專用 `coolpc` 帳號）的 clone、
+所有權移交、uv 安裝、虛擬環境建立與 Alembic 初始化，請依
+[`docs/new-machine-setup.md`](docs/new-machine-setup.md#第一部分在新的-ubuntu-server-上部署)
+逐步執行。移交所有權後，虛擬環境、相依套件及資料庫初始化都以 `coolpc`
+身分執行。若採這台機器的使用者層級部署，專案由登入帳號持有並以該帳號
+執行安裝指令；兩種帳號與指令不要混用。
 
 `data/raw_html/` 目錄用於永久保存每次抓取的原始 HTML，請確保有足夠磁碟空間
 並定期備份整個 `data/` 目錄（資料庫 + 原始 HTML）。備份與日後 schema 變更的
@@ -339,14 +312,5 @@ AGENTS.md                開發慣例與地雷（接手改程式碼前必讀）
 
 ## 文件索引
 
-| 文件 | 內容 |
-|---|---|
-| [`AGENTS.md`](AGENTS.md) | **開發慣例與地雷**：接手改這個專案前必讀 |
-| [`docs/architecture.md`](docs/architecture.md) | 系統架構、資料流、解析/比對/合併邏輯細節 |
-| [`docs/database-schema.md`](docs/database-schema.md) | 完整資料表/欄位說明，含已移除欄位紀錄 |
-| [`docs/api-reference.md`](docs/api-reference.md) | 公開 JSON API 完整參考 |
-| [`docs/admin-guide.md`](docs/admin-guide.md) | 管理介面逐頁操作說明 |
-| [`docs/search-semantics.md`](docs/search-semantics.md) | AND/OR 搜尋語意詳細規則 |
-| [`docs/deployment.md`](docs/deployment.md) | 正式環境部署、備份、schema migration 操作程序 |
-| [`docs/new-machine-setup.md`](docs/new-machine-setup.md) | 在新機器上從 git 佈署、批次匯入既有 HTML |
-| [`docs/development.md`](docs/development.md) | 開發慣例、TDD 流程、新增 migration |
+請從 [`docs/README.md`](docs/README.md) 按任務查找現行文件；歷史規格與
+實作計畫另列於該索引，不代表目前實作或待辦。

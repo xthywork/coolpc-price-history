@@ -95,12 +95,13 @@ uv run pytest -k "merge"               # 依名稱關鍵字篩選
    「為什麼」註解）。檔名慣例：`NNNN_簡短描述.py`（四位數流水號，接續現有
    最大號碼），內容包含 `revision`/`down_revision`（接續現有最新 head）、
    `upgrade()`、`downgrade()`。
-3. SQLite 對 `ALTER TABLE` 的支援有限（尤其是 `DROP COLUMN`、修改欄位型別/
-   約束），一律用 `op.batch_alter_table("表名") as batch_op:` 包住欄位變更
-   操作（Alembic 會自動用「建新表→搬資料→替換」的方式達成，不依賴特定
-   SQLite 版本的原生語法）。可參考
+3. SQLite 對部分 `ALTER TABLE` 操作支援有限。需要重建表或 SQLite 不支援的
+   欄位／約束變更，使用 `op.batch_alter_table("表名") as batch_op:`；需要
+   重建表時，Alembic 以「建新表→搬資料→替換」處理。可參考
    `migrations/versions/0006_drop_last_change_columns.py`、
-   `migrations/versions/0007_drop_product_first_seen_at.py`。
+   `migrations/versions/0007_drop_product_first_seen_at.py`。一般新增欄位可直接
+   使用 `op.add_column()`，如 `0004_category_display_names.py` 與
+   `0005_category_sort_order.py`；不要把所有欄位變更都視為必須使用 batch。
 4. 若是移除欄位，記得同步檢查並更新所有使用到該欄位的地方：
    `src/coolpc/**/*.py`、`src/coolpc/**/templates/*.html`、以及**所有**
    測試檔案裡建立該 model 的 fixture（欄位移除後，測試裡任何還在傳入該

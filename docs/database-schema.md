@@ -37,7 +37,7 @@ model，schema 演進一律透過 Alembic migration（`migrations/versions/`）�
 
 `Category.label`（Python property）= `display_name or name`。除了管理後台
 「商品詳細資料」頁的分類欄位**刻意**改用原始 `name`（見
-[`docs/admin-guide.md`](admin-guide.md#商品搜尋--詳細編輯頁)）之外，其餘所有
+[`docs/admin-guide.md`](admin-guide.md#商品搜尋--詳細編輯頁products)）之外，其餘所有
 頁面與 API（分類下拉選單、搜尋結果的分類文字、`/api/categories`）一律顯示
 `label`。
 
@@ -71,9 +71,9 @@ model，schema 演進一律透過 Alembic migration（`migrations/versions/`）�
 | `model` | str, nullable | 從名稱中「【型號】」/「｛型號｝」括號樣式擷取（`ingest.service.guess_model`）；並非每個商品名稱都有這種括號標記，抓不到就是 `None`，不是系統性缺失 |
 | `current_status` | str, nullable | 原價屋原始狀態文字（例如「現貨」「訂」「客訂」「拆封品」），從名稱中的括號標記擷取 |
 | `current_price` | int | 目前價格 |
-| `is_active` | bool | 是否仍在原價屋上架中；每次成功抓取後，所有「本次快照沒出現」的商品會被設為 `False`（除非本次判定為 `partial`，見下方「I6 保護機制」） |
+| `is_active` | bool | 是否仍在原價屋上架中；每次成功抓取或匯入後，所有「本次快照沒出現」的上架商品會被設為 `False`（`partial` 例外） |
 | `last_seen_at` | datetime | 最後一次被抓到的估價時間（來自 HTML 內嵌時間戳，不是牆上時鐘時間） |
-| `merged_into_id` | int, nullable, FK → `products.id` | 若此商品已被合併掉，指向合併後保留的目標商品；對外（公開 API/頁面）一律視為不存在（404） |
+| `merged_into_id` | int, nullable, FK → `products.id` | 若此商品已被合併掉，指向合併後保留的目標商品；公開搜尋不列出，單一商品詳細/歷史/統計端點回 404；批次走勢忽略該 id |
 | `created_at` | datetime | 此商品第一次被抓到時的估價時間 |
 
 ### 已移除的欄位（請勿重新加回）
@@ -87,6 +87,13 @@ model，schema 演進一律透過 Alembic migration（`migrations/versions/`）�
 
 `product_names.first_seen_at`（見下方）是**不同、獨立**的欄位，未受影響，
 仍然存在且持續使用中。
+
+匯入較舊且尚未處理過的快照時，`ingest_product()` 仍會覆寫既有商品的
+`current_price`、`current_status`、`is_active`、`last_seen_at` 及分類；
+成功快照的下架比對也不檢查時間先後，可能把只在較新快照出現的目前上架商品
+標記下架。`partial` 只跳過下架比對，不阻止快照中商品的目前欄位倒退。
+同一 `fetched_at` 若已有成功或 partial 快照則直接略過；詳見下方
+[`scrape_snapshots`](#scrape_snapshots)。
 
 ## `product_names`
 
@@ -127,9 +134,9 @@ model，schema 演進一律透過 Alembic migration（`migrations/versions/`）�
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `id` | int, PK | |
-| `fetched_at` | datetime | 估價時間（HTML 內嵌時間戳） |
+| `fetched_at` | datetime | 成功/partial 快照採 HTML 內嵌估價時間；failed 紀錄採系統時間 |
 | `scrape_type` | str | `"scheduled"` \| `"manual"` \| `"import"` |
-| `raw_html_path` | str, nullable | 原始 HTML 檔案在 `data/raw_html/` 下的路徑；解析失敗（fetch 失敗）時為 `None` |
+| `raw_html_path` | str, nullable | 抓取時為已存原始 HTML 的路徑；新建的匯入紀錄使用呼叫者提供的來源路徑；重匯若命中既有 success/partial 快照則保留原路徑；抓取階段 fetch 失敗才為 `None` |
 | `status` | str，預設 `"success"` | `"success"` \| `"partial"` \| `"failed"` |
 | `error_message` | str, nullable | 失敗時的錯誤訊息 |
 | `total_products` | int，預設 `0` | 本次解析到的商品總數 |
@@ -140,8 +147,8 @@ model，schema 演進一律透過 Alembic migration（`migrations/versions/`）�
 
 ### `status` 狀態機
 
-- `"failed"`：HTTP 抓取失敗，或 HTML 解析失敗（找不到估價時間欄位、找不到
-  商品表格、完全解析不出任何商品）。
+- `"failed"`：HTTP 抓取失敗、HTML 解析失敗（找不到估價時間欄位、找不到
+  商品表格、完全解析不出任何商品），或解析後寫入資料庫失敗。
 - `"partial"`：**I6 保護機制**——本次解析到的商品總數低於「上一次真正成功」
   快照商品總數的 70% 時觸發，代表原站 HTML 結構可能局部改版、解析可能不
   完整。觸發時**完全跳過下架比對**，寧可暫時保留所有商品現有的 `is_active`
@@ -153,7 +160,14 @@ model，schema 演進一律透過 Alembic migration（`migrations/versions/`）�
 `ingest_snapshot` 對相同 `fetched_at` 是 idempotent 的：若已有一筆
 `status` 為 `"success"` 或 `"partial"` 的紀錄，重複匯入同一個 `fetched_at`
 會直接回傳既有紀錄、不重新處理，避免補匯歷史檔案時重複寫入
-`price_history`。
+`price_history`；也不會以這次傳入的來源路徑覆寫既有 `raw_html_path`。
+
+抓取流程先解析再存檔：解析成功按 HTML 估價時間存入
+`data/raw_html/YYYY/MM/DD/`，檔名撞名會加數字後綴；解析失敗則按系統時間
+存檔並記錄 failed；fetch 失敗沒有原始檔案。匯入流程不複製原始 HTML；
+新建的成功或失敗紀錄使用傳入的來源路徑。後台直接開啟 `raw_html_path`，
+匯入後搬動或刪除來源檔會使封存檢視失效。`created_at` 記錄建立時間，
+使用系統時間；其餘商品與價格歷史時間使用 HTML 估價時間。
 
 ## `merge_log`
 

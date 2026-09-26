@@ -4,8 +4,9 @@
 `src/coolpc/public_api/routers/api.py`，前綴一律是 `/api`。無需登入或
 API Key。所有回應皆為 JSON，schema 定義於 `src/coolpc/public_api/schemas.py`。
 
-已被合併掉的商品（`merged_into_id` 不為 `None`）對所有端點一律視為不存在，
-回傳 `404`。
+已被合併掉的商品（`merged_into_id` 不為 `None`）不會出現在商品列表或
+自動完成；單一商品詳細/價格歷史/統計及比較端點遇到該 id 回 `404`。
+批次走勢端點則忽略不存在或已合併的 id，不因個別 id 回 `404`。
 
 ## `GET /api/categories`
 
@@ -29,7 +30,7 @@ API Key。所有回應皆為 JSON，schema 定義於 `src/coolpc/public_api/sche
 | 參數 | 型別 | 預設 | 說明 |
 |---|---|---|---|
 | `q` | string | 無 | 搜尋關鍵字，空白分隔多個 token；語意見 [`docs/search-semantics.md`](search-semantics.md) |
-| `q_match` | `"and"` \| `"or"` | `"and"` | 見上方連結 |
+| `q_match` | string | `"and"` | 只有精確等於 `"and"` 走 AND；`"or"` 及任何其他字串走 OR，沒有值域驗證。詳見 [`docs/search-semantics.md`](search-semantics.md) |
 | `category_id` | int | 無 | |
 | `subcategory_id` | int | 無 | |
 | `brand` | string | 無 | 精確等值比對 |
@@ -73,6 +74,10 @@ API Key。所有回應皆為 JSON，schema 定義於 `src/coolpc/public_api/sche
 `price_history` 計算（`compute_product_stats`），非資料庫欄位快取值；商品
 無足夠歷史資料時對應欄位為 `null`。
 
+列表與下方自動完成均排除 `current_price = 1` 的項目；管理後台搜尋保留。
+名稱及 `model` 的 `LIKE` 篩選不逸出 `%`、`_`，萬用字元行為見
+[`docs/search-semantics.md`](search-semantics.md#sql-like-萬用字元)。
+
 ## `GET /api/products/autocomplete`
 
 精確挑選單一商品用的自動完成端點（給前端下拉選單/chip 挑選器使用），
@@ -98,9 +103,9 @@ API Key。所有回應皆為 JSON，schema 定義於 `src/coolpc/public_api/sche
 | `days` | int | `30` | 只回傳最近幾天的價格點（`1` ～ `3650`） |
 
 已被合併掉、或不存在的 id 會靜靜被忽略（不會出現在回傳結果的 key
-裡），不會因為其中一個 id 無效就讓整個請求失敗。若該時間範圍內的資料點少於
-2 筆（不足以畫出一條線），改回退取該商品最後 32 筆價格點，避免早已下架、
-歷史停在幾個月前的商品在列表上開天窗。
+裡），不會因為其中一個 id 無效就讓整個請求失敗。若個別商品在該時間範圍內
+的資料點少於 2 筆（不足以畫出一條線），會補取其合併群組各成員最後最多
+32 筆歷史價格，再取樣為最多 32 點；已有的近期點也會保留。
 
 ```json
 { "123": [18990, 18990, 17990], "456": [4290, 4290] }
